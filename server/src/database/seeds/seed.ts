@@ -11,6 +11,10 @@ const dataSource = new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'a25_db',
+  ssl:
+    process.env.DB_SSL?.toLowerCase() === 'true'
+      ? { rejectUnauthorized: false }
+      : false,
 });
 
 async function seed() {

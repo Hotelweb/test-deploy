@@ -25,6 +25,10 @@ async function reset() {
     user: username,
     password,
     database: 'postgres',
+    ssl:
+      process.env.DB_SSL?.toLowerCase() === 'true'
+        ? { rejectUnauthorized: false }
+        : false,
   });
 
   console.log(`🔌 Connecting to ${host}:${port} as ${username}…`);

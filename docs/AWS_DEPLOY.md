@@ -78,6 +78,7 @@ Bat buoc:
 - `SERVER_SSH_KEY`: noi dung private key `~/.ssh/a25_aws`
 - `DB_HOST`: output `db_host`
 - `DB_PORT`: `5432`
+- `DB_SSL`: workflow tu ghi `true` cho RDS
 - `DB_USERNAME`: output `db_username`, mac dinh `a25admin`
 - `DB_PASSWORD`: output `db_password`
 - `DB_NAME`: output `db_name`, mac dinh `a25_db`
@@ -132,6 +133,7 @@ Neu can seed sau deploy:
 ```bash
 ssh -i ~/.ssh/a25_aws ubuntu@EC2_PUBLIC_IP
 cd /opt/a25/server
+echo 'DB_SSL="true"' >> .env.production
 set -a
 . ./.env.production
 set +a

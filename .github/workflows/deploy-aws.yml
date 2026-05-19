@@ -109,6 +109,7 @@ jobs:
           write_env FRONTEND_URL "http://${SERVER_HOST}"
           write_env DB_HOST "$DB_HOST"
           write_env DB_PORT "$DB_PORT"
+          write_env DB_SSL true
           write_env DB_USERNAME "$DB_USERNAME"
           write_env DB_PASSWORD "$DB_PASSWORD"
           write_env DB_NAME "$DB_NAME"

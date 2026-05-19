@@ -30,6 +30,10 @@ async function run(): Promise<void> {
     user: process.env.DB_USERNAME ?? 'postgres',
     password: process.env.DB_PASSWORD ?? 'postgres',
     database: process.env.DB_NAME ?? 'a25_db',
+    ssl:
+      process.env.DB_SSL?.toLowerCase() === 'true'
+        ? { rejectUnauthorized: false }
+        : false,
   });
 
   await client.connect();
