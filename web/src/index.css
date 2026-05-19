@@ -1,0 +1,274 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Brand colors - Hotel sage green palette */
+  --color-primary: #2d5016;
+  --color-primary-light: #7c9885;
+  --color-primary-dark: #1f3a0f;
+  --color-secondary: #8b9d83;
+  --color-accent: #d4af37;
+  --color-accent-light: #e8c869;
+
+  /* Surface */
+  --color-background: #fafaf9;
+  --color-background-warm: #f5f3ef;
+  --color-surface: #ffffff;
+  --color-surface-glass: rgba(255, 255, 255, 0.9);
+
+  /* Text */
+  --color-text: #111827;
+  --color-text-muted: #4b5563;
+  --color-text-light: #6b7280;
+  --color-text-lighter: #9ca3af;
+
+  /* Borders */
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  --color-border-lighter: #f9fafb;
+
+  /* Service tile background colors */
+  --color-tile-blue: #dbeafe;
+  --color-tile-orange: #ffedd5;
+  --color-tile-green: #dcfce7;
+  --color-tile-purple: #f3e8ff;
+  --color-tile-red: #fee2e2;
+  --color-tile-yellow: #fef9c3;
+  --color-tile-indigo: #e0e7ff;
+  --color-tile-pink: #fce7f3;
+  --color-tile-teal: #ccfbf1;
+  --color-tile-emerald: #d1fae5;
+  --color-tile-sky: #e0f2fe;
+  --color-tile-violet: #ede9fe;
+  --color-tile-rose: #fff1f2;
+  --color-tile-amber: #fffbeb;
+  --color-tile-lime: #f7fee7;
+  --color-tile-fuchsia: #fdf4ff;
+  --color-tile-cyan: #ecfeff;
+  --color-tile-slate: #f8fafc;
+}
+
+html {
+  font-family: var(--font-body);
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-background);
+  min-height: 100vh;
+  color: var(--color-text);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Glass morphism utilities */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.glass-card {
+  background: #ffffff;
+  border: 1px solid #f3f4f6;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.glass-card-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-hover:hover {
+  border-color: #e5e7eb;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.06),
+    0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+/* Premium shadows */
+.shadow-soft {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow-card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
+}
+
+.shadow-card-hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 2px 4px -2px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-elevated {
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.08),
+    0 4px 6px -2px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-modal {
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.08);
+}
+
+.shadow-fab {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Brand gradients */
+.gradient-hero {
+  background: linear-gradient(
+    135deg,
+    rgba(45, 80, 22, 0.9) 0%,
+    rgba(124, 152, 133, 0.85) 50%,
+    rgba(212, 175, 55, 0.7) 100%
+  );
+}
+
+.gradient-hero-rich {
+  background: linear-gradient(
+    135deg,
+    rgba(6, 95, 70, 1) 0%,
+    rgba(5, 150, 105, 1) 50%,
+    rgba(217, 119, 6, 1) 100%
+  );
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, #2d5016 0%, #8b9d83 100%);
+}
+
+.gradient-indigo {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.gradient-blue-purple {
+  background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+}
+
+/* Animations */
+@keyframes slide-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.5s infinite;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Text balance for headings */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+/* Focus rings */
+:focus-visible {
+  outline: none;
+}

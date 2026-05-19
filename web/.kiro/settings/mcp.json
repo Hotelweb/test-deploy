@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {},
+      "disabled": true,
+      "autoApprove": []
+    },
+    "figma": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "figma-developer-mcp",
+        "--figma-api-key=figd_1SmetKGazbDguVlQ-nE-hJpPn9lzpTtTYlolK1vn",
+        "--stdio"
+      ],
+      "env": {},
+      "disabled": false,
+      "autoApprove": ["get_figma_data"]
+    }
+  }
+}

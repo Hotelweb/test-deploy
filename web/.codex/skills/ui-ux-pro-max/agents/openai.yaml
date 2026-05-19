@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI/UX Pro Max"
+  short_description: "Design systems and UI implementation guidance"
+  default_prompt: "Use $ui-ux-pro-max to design and implement a polished responsive interface."
