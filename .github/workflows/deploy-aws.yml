@@ -18,8 +18,8 @@ jobs:
         with:
           node-version: "22.13.1"
 
-      - name: Enable pnpm
-        run: corepack enable
+      - name: Install pnpm
+        run: npm install -g pnpm@11.1.3
 
       - name: Build server artifact
         working-directory: server
