@@ -25,7 +25,8 @@
     "db:reset:prod": "DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/reset-db.js",
     "db:fresh": "ts-node src/database/seeds/reset-db.ts && ts-node src/database/seeds/seed.ts",
     "db:fresh:prod": "DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/reset-db.js && DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/seed.js && DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js",
-    "migrate": "ts-node src/database/migrations/run-migration.ts"
+    "migrate": "ts-node src/database/migrations/run-migration.ts",
+    "migrate:prod": "DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
