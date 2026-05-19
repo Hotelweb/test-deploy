@@ -157,6 +157,7 @@ jobs:
           rmdir /var/www/a25/dist
 
           cp /opt/a25/.env.production /opt/a25/server/.env.production
+          cd /opt/a25/server
           DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js
 
           sudo tee /etc/systemd/system/a25-server.service >/dev/null <<'SERVICE'
