@@ -134,8 +134,22 @@ Neu can seed sau deploy:
 ssh -i ~/.ssh/a25_aws ubuntu@EC2_PUBLIC_IP
 cd /opt/a25/server
 echo 'DB_SSL="true"' >> .env.production
-node dist/database/seeds/seed.js
+DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/seed.js
 ```
+
+Neu database test da bi lech schema va can reset giong `db:fresh` local:
+
+```bash
+ssh -i ~/.ssh/a25_aws ubuntu@EC2_PUBLIC_IP
+cd /opt/a25/server
+sudo systemctl stop a25-server
+DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/reset-db.js
+DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/seed.js
+DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js
+sudo systemctl start a25-server
+```
+
+Lenh nay xoa toan bo data trong database `DB_NAME`, chi dung cho moi truong test.
 
 Kiem tra service:
 

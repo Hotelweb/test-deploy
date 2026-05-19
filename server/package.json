@@ -20,8 +20,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node src/database/seeds/seed.ts",
+    "seed:prod": "DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/seed.js",
     "db:reset": "ts-node src/database/seeds/reset-db.ts",
+    "db:reset:prod": "DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/reset-db.js",
     "db:fresh": "ts-node src/database/seeds/reset-db.ts && ts-node src/database/seeds/seed.ts",
+    "db:fresh:prod": "DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/reset-db.js && DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/seed.js && DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js",
     "migrate": "ts-node src/database/migrations/run-migration.ts"
   },
   "dependencies": {
