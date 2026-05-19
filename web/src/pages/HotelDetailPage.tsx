@@ -224,7 +224,6 @@ export function HotelDetailPage() {
             <div className="absolute top-5 right-5 z-10 hidden md:block">
               <div className="bg-white p-2 rounded-2xl shadow-elevated border border-border-light">
                 <QRCodeSVG
-                  ref={qrRef}
                   value={hotelPageUrl}
                   size={80}
                   level="M"
@@ -241,6 +240,36 @@ export function HotelDetailPage() {
               </div>
             </div>
           </div>
+
+          <section className="md:hidden glass-card rounded-2xl p-4 flex items-center gap-4">
+            <div className="bg-white p-2 rounded-2xl border border-border-light shadow-soft flex-shrink-0">
+              <QRCodeSVG
+                ref={qrRef}
+                value={hotelPageUrl}
+                size={88}
+                level="M"
+                bgColor="#ffffff"
+                fgColor="#2D5016"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-text">
+                {lang === 'VN' ? 'Mã QR khách sạn' : 'Hotel QR code'}
+              </p>
+              <p className="text-[12px] text-text-light mt-1 line-clamp-2">
+                {lang === 'VN'
+                  ? 'Quét hoặc tải mã để mở lại trang dịch vụ.'
+                  : 'Scan or download this code to reopen the services page.'}
+              </p>
+              <button
+                type="button"
+                onClick={downloadQr}
+                className="mt-3 px-3 py-2 rounded-xl bg-primary text-white text-[12px] font-semibold cursor-pointer"
+              >
+                {lang === 'VN' ? 'Tải QR' : 'Download QR'}
+              </button>
+            </div>
+          </section>
 
           {/* Hotel Info Card */}
           <HotelCard name={hotel.name} address={hotel.address || ''} onClick={() => {}} />
