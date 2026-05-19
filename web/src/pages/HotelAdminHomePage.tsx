@@ -5,6 +5,7 @@ import { EditHotelModal } from '../components/EditHotelModal'
 import { UserMenu } from '../components/UserMenu'
 import {
   ArrowRightIcon,
+  BellIcon,
   ChatIcon,
   EditIcon,
   EyeIcon,
@@ -13,6 +14,8 @@ import {
   ServicesIcon,
 } from '../components/icons/ServiceIcons'
 import { useAuth } from '../hooks/useAuth'
+import { useHotelAdminNotifications } from '../hooks/useHotelAdminNotifications'
+import type { AdminNotificationItem } from '../hooks/useHotelAdminNotifications'
 
 export function HotelAdminHomePage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()
@@ -24,6 +27,8 @@ export function HotelAdminHomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingHotel, setEditingHotel] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notifications = useHotelAdminNotifications(hotelId || 0)
 
   const loadHotel = useCallback(async () => {
     if (!hotelId) return
@@ -122,6 +127,26 @@ export function HotelAdminHomePage() {
             </div>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+            <NotificationBell
+              open={notificationsOpen}
+              onToggle={() => setNotificationsOpen((prev) => !prev)}
+              onClose={() => setNotificationsOpen(false)}
+              chatUnread={notifications.chatUnread}
+              pendingOrders={notifications.pendingOrders}
+              total={notifications.total}
+              items={notifications.items}
+              permission={notifications.permission}
+              onEnableBrowserNotifications={notifications.enableBrowserNotifications}
+              onClearRecent={notifications.clearRecent}
+              onOpenChat={() => {
+                setNotificationsOpen(false)
+                navigate(`/admin/${hotelId}/chat`)
+              }}
+              onOpenOrders={() => {
+                setNotificationsOpen(false)
+                navigate(`/admin/${hotelId}/food-order`)
+              }}
+            />
             {auth?.user.scope === 'system' ? (
               <button
                 type="button"
@@ -207,6 +232,171 @@ export function HotelAdminHomePage() {
           setEditingHotel(false)
         }}
       />
+    </div>
+  )
+}
+
+function NotificationBell({
+  open,
+  onToggle,
+  onClose,
+  chatUnread,
+  pendingOrders,
+  total,
+  items,
+  permission,
+  onEnableBrowserNotifications,
+  onClearRecent,
+  onOpenChat,
+  onOpenOrders,
+}: {
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
+  chatUnread: number
+  pendingOrders: number
+  total: number
+  items: AdminNotificationItem[]
+  permission: NotificationPermission
+  onEnableBrowserNotifications: () => void
+  onClearRecent: () => void
+  onOpenChat: () => void
+  onOpenOrders: () => void
+}) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="relative w-10 h-10 rounded-xl bg-white border border-border text-text-muted hover:bg-gray-50 hover:text-primary flex items-center justify-center cursor-pointer transition-colors"
+        aria-label={total > 0 ? `Thông báo (${total})` : 'Thông báo'}
+      >
+        <BellIcon className="w-5 h-5" />
+        {total > 0 ? (
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-soft">
+            {total > 99 ? '99+' : total}
+          </span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-30 cursor-default"
+            aria-label="Đóng thông báo"
+            onClick={onClose}
+          />
+          <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2rem))] bg-white border border-border rounded-2xl shadow-modal overflow-hidden">
+            <div className="px-4 py-3 border-b border-border-light flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[13.5px] font-semibold text-text">Thông báo</p>
+                <p className="text-[11.5px] text-text-light">
+                  {total > 0 ? `${total} mục cần xử lý` : 'Không có mục mới'}
+                </p>
+              </div>
+              {items.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={onClearRecent}
+                  className="text-[11.5px] font-medium text-text-light hover:text-text cursor-pointer"
+                >
+                  Xoá gần đây
+                </button>
+              ) : null}
+            </div>
+
+            <div className="p-3 grid grid-cols-2 gap-2 border-b border-border-light">
+              <button
+                type="button"
+                onClick={onOpenChat}
+                className="rounded-xl border border-border-light bg-indigo-50/50 hover:bg-indigo-50 px-3 py-2.5 text-left cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-indigo-700">
+                  <ChatIcon className="w-4 h-4" />
+                  Chat
+                </span>
+                <span className="block text-lg font-bold text-text mt-1">{chatUnread}</span>
+                <span className="block text-[11px] text-text-light">tin chưa đọc</span>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenOrders}
+                className="rounded-xl border border-border-light bg-orange-50/60 hover:bg-orange-50 px-3 py-2.5 text-left cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-orange-700">
+                  <InRoomDiningIcon className="w-4 h-4" />
+                  Đơn hàng
+                </span>
+                <span className="block text-lg font-bold text-text mt-1">{pendingOrders}</span>
+                <span className="block text-[11px] text-text-light">đơn chờ xử lý</span>
+              </button>
+            </div>
+
+            {permission !== 'granted' ? (
+              <div className="px-3 py-2 border-b border-border-light bg-gray-50">
+                <button
+                  type="button"
+                  onClick={onEnableBrowserNotifications}
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-border text-[12.5px] font-medium text-text-muted hover:text-primary hover:border-primary/30 cursor-pointer transition-colors"
+                >
+                  Bật thông báo trình duyệt
+                </button>
+              </div>
+            ) : null}
+
+            <div className="max-h-72 overflow-y-auto">
+              {items.length === 0 ? (
+                <p className="px-4 py-6 text-center text-[13px] text-text-light">
+                  Chưa có thông báo gần đây
+                </p>
+              ) : (
+                <ul role="list" className="divide-y divide-border-light">
+                  {items.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={item.kind === 'chat' ? onOpenChat : onOpenOrders}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <span className="flex items-start gap-2">
+                          <span
+                            className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              item.kind === 'chat'
+                                ? 'bg-indigo-50 text-indigo-700'
+                                : 'bg-orange-50 text-orange-700'
+                            }`}
+                          >
+                            {item.kind === 'chat' ? (
+                              <ChatIcon className="w-3.5 h-3.5" />
+                            ) : (
+                              <InRoomDiningIcon className="w-3.5 h-3.5" />
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[13px] font-semibold text-text line-clamp-1">
+                              {item.title}
+                            </span>
+                            <span className="block text-[12px] text-text-muted line-clamp-2 mt-0.5">
+                              {item.body}
+                            </span>
+                            <span className="block text-[10.5px] text-text-lighter mt-1">
+                              {new Date(item.createdAt).toLocaleTimeString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

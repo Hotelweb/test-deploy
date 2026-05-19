@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHotelBySlug, getHotelServices } from '../api'
@@ -12,6 +12,27 @@ import { ServiceDetailModal } from '../components/ServiceDetailModal'
 import { TopHeader } from '../components/TopHeader'
 import heroImage from '../assets/hero.png'
 
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.lineTo(x + width - radius, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
+  ctx.lineTo(x + width, y + height - radius)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  ctx.lineTo(x + radius, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
+  ctx.lineTo(x, y + radius)
+  ctx.quadraticCurveTo(x, y, x + radius, y)
+  ctx.closePath()
+}
+
 export function HotelDetailPage() {
   const navigate = useNavigate()
   const { slug } = useParams<{ slug: string }>()
@@ -22,6 +43,7 @@ export function HotelDetailPage() {
   const [showChat, setShowChat] = useState(false)
   const [lang, setLang] = useState<'VN' | 'EN'>('VN')
   const [activeService, setActiveService] = useState<HotelService | null>(null)
+  const qrRef = useRef<SVGSVGElement | null>(null)
 
   useEffect(() => {
     if (!slug) return
@@ -85,6 +107,96 @@ export function HotelDetailPage() {
   }
 
   const hotelPageUrl = `${window.location.origin}/hotel/${hotel.slug}`
+  const downloadQr = () => {
+    const svg = qrRef.current
+    if (!svg) return
+    const serializer = new XMLSerializer()
+    const source = serializer.serializeToString(svg)
+    const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(svgBlob)
+    const image = new Image()
+    image.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 900
+      canvas.height = 1200
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        URL.revokeObjectURL(url)
+        return
+      }
+
+      const wrapText = (
+        text: string,
+        x: number,
+        y: number,
+        maxWidth: number,
+        lineHeight: number,
+      ) => {
+        const words = text.split(/\s+/)
+        let line = ''
+        let cursorY = y
+        for (const word of words) {
+          const testLine = line ? `${line} ${word}` : word
+          if (ctx.measureText(testLine).width > maxWidth && line) {
+            ctx.fillText(line, x, cursorY)
+            line = word
+            cursorY += lineHeight
+          } else {
+            line = testLine
+          }
+        }
+        if (line) ctx.fillText(line, x, cursorY)
+        return cursorY + lineHeight
+      }
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      ctx.fillStyle = '#F6F8F4'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = '#ffffff'
+      roundRect(ctx, 70, 70, 760, 1060, 36)
+      ctx.fill()
+
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#1F2A1D'
+      ctx.font = 'bold 46px Arial, sans-serif'
+      const nextY = wrapText(hotel.name, canvas.width / 2, 160, 680, 56)
+
+      if (hotel.address) {
+        ctx.fillStyle = '#687365'
+        ctx.font = '26px Arial, sans-serif'
+        wrapText(hotel.address, canvas.width / 2, nextY + 8, 680, 34)
+      }
+
+      ctx.fillStyle = '#ffffff'
+      roundRect(ctx, 190, 360, 520, 520, 28)
+      ctx.fill()
+      ctx.strokeStyle = '#E3E8DE'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.drawImage(image, 220, 390, 460, 460)
+
+      ctx.fillStyle = '#2D5016'
+      ctx.font = 'bold 28px Arial, sans-serif'
+      ctx.fillText(
+        lang === 'VN' ? 'Quét mã để xem dịch vụ' : 'Scan to view services',
+        canvas.width / 2,
+        945,
+      )
+
+      ctx.fillStyle = '#687365'
+      ctx.font = '22px Arial, sans-serif'
+      wrapText(hotelPageUrl, canvas.width / 2, 1000, 680, 30)
+      URL.revokeObjectURL(url)
+
+      const link = document.createElement('a')
+      link.href = canvas.toDataURL('image/png')
+      link.download = `${hotel.slug}-qr.png`
+      link.click()
+    }
+    image.src = url
+  }
 
   return (
     <div className="min-h-screen bg-background-warm">
@@ -110,14 +222,22 @@ export function HotelDetailPage() {
 
             {/* QR Code - desktop only */}
             <div className="absolute top-5 right-5 z-10 hidden md:block">
-              <div className="w-24 h-24 bg-white p-2 rounded-2xl shadow-elevated border border-border-light">
+              <div className="bg-white p-2 rounded-2xl shadow-elevated border border-border-light">
                 <QRCodeSVG
+                  ref={qrRef}
                   value={hotelPageUrl}
                   size={80}
                   level="M"
                   bgColor="#ffffff"
                   fgColor="#2D5016"
                 />
+                <button
+                  type="button"
+                  onClick={downloadQr}
+                  className="mt-2 w-full px-2 py-1.5 rounded-xl bg-primary text-white text-[11px] font-semibold hover:bg-primary-dark cursor-pointer transition-colors"
+                >
+                  Tải QR
+                </button>
               </div>
             </div>
           </div>
