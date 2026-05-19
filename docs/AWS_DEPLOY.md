@@ -30,6 +30,8 @@ Lay public IP cua may ban de khoa SSH:
 curl https://checkip.amazonaws.com
 ```
 
+Neu deploy bang GitHub-hosted Actions, runner cua GitHub khong dung IP nha ban, nen `admin_ssh_cidr = "YOUR_PUBLIC_IP/32"` se lam workflow khong SSH duoc vao EC2. Cho moi truong test ngan han, dat `admin_ssh_cidr = "0.0.0.0/0"` de GitHub Actions deploy duoc, sau do thu hep lai hoac dung self-hosted runner/VPN neu can chat hon.
+
 Tao file `infra/aws/terraform.tfvars` tu file mau:
 
 ```hcl
@@ -104,6 +106,14 @@ Sau khi workflow xong, mo:
 http://EC2_PUBLIC_IP
 http://EC2_PUBLIC_IP/api/docs
 ```
+
+Neu workflow fail o buoc `Upload release to EC2`, kiem tra:
+
+- `SERVER_HOST` dung public IP moi nhat cua EC2 trong Terraform output.
+- `SERVER_USER` la `ubuntu`.
+- `SERVER_SSH_KEY` la private key, noi dung file `~/.ssh/a25_aws`, khong phai file `.pub`.
+- Private key khong dat passphrase vi GitHub Actions chay non-interactive.
+- Security group EC2 dang mo port 22 cho IP cua GitHub runner. Neu `admin_ssh_cidr` chi la IP nha ban, GitHub runner se khong SSH duoc. De test nhanh co the tam mo `0.0.0.0/0`, deploy xong nen thu hep lai.
 
 ## 5. Seed du lieu test
 

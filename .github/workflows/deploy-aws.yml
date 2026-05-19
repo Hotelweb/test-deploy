@@ -31,12 +31,31 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
         run: |
+          test -n "$SERVER_HOST" || (echo "SERVER_HOST secret is empty" && exit 1)
+          test -n "$SERVER_USER" || (echo "SERVER_USER secret is empty" && exit 1)
+          test -n "$SERVER_SSH_KEY" || (echo "SERVER_SSH_KEY secret is empty" && exit 1)
+
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/a25_aws
+          printf '%s\n' "$SERVER_SSH_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > ~/.ssh/a25_aws
           chmod 600 ~/.ssh/a25_aws
-          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
-          ssh -i ~/.ssh/a25_aws "$SERVER_USER@$SERVER_HOST" "mkdir -p /opt/a25/app"
-          scp -i ~/.ssh/a25_aws /tmp/a25-release.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-release.tgz"
+
+          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "echo ssh-ready"; then
+              break
+            fi
+            if [ "$attempt" = "10" ]; then
+              echo "Unable to connect to EC2 over SSH after 10 attempts."
+              echo "Check SERVER_HOST, SERVER_USER, SERVER_SSH_KEY, EC2 state, and security group port 22."
+              exit 1
+            fi
+            echo "SSH is not ready yet, retrying in 15 seconds..."
+            sleep 15
+          done
+
+          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "sudo mkdir -p /opt/a25/app && sudo chown -R $SERVER_USER:$SERVER_USER /opt/a25"
+          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 /tmp/a25-release.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-release.tgz"
 
       - name: Deploy containers
         env:
@@ -56,8 +75,11 @@ jobs:
           SYSTEM_ADMIN_EMAIL: ${{ secrets.SYSTEM_ADMIN_EMAIL }}
           SYSTEM_ADMIN_PASSWORD: ${{ secrets.SYSTEM_ADMIN_PASSWORD }}
           SYSTEM_ADMIN_NAME: ${{ secrets.SYSTEM_ADMIN_NAME }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
         run: |
-          ssh -i ~/.ssh/a25_aws "$SERVER_USER@$SERVER_HOST" \
+          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30"
+          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" \
             "DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' DB_NAME='$DB_NAME' JWT_SECRET='$JWT_SECRET' CLOUDINARY_CLOUD_NAME='$CLOUDINARY_CLOUD_NAME' CLOUDINARY_API_KEY='$CLOUDINARY_API_KEY' CLOUDINARY_API_SECRET='$CLOUDINARY_API_SECRET' CLOUDINARY_FOLDER='${CLOUDINARY_FOLDER:-a25}' GOOGLE_TRANSLATE_API_KEY='$GOOGLE_TRANSLATE_API_KEY' OPENAI_API_KEY='$OPENAI_API_KEY' DEEPL_API_KEY='$DEEPL_API_KEY' SYSTEM_ADMIN_EMAIL='$SYSTEM_ADMIN_EMAIL' SYSTEM_ADMIN_PASSWORD='$SYSTEM_ADMIN_PASSWORD' SYSTEM_ADMIN_NAME='$SYSTEM_ADMIN_NAME' SERVER_HOST='$SERVER_HOST' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /opt/a25/app
