@@ -2,9 +2,9 @@
 
 Kien truc nay toi uu cho moi truong test:
 
-- 1 EC2 `t3.micro` chay Docker Compose: `web` nginx + `server` NestJS.
+- 1 EC2 `t3.micro` chay nginx + NestJS bang `systemd`.
 - 1 RDS PostgreSQL Single-AZ `db.t4g.micro` hoac `db.t3.micro`.
-- Khong dung NAT Gateway, ALB, ECR, CodePipeline de giam chi phi.
+- Khong dung Docker, NAT Gateway, ALB, ECR, CodePipeline de giam chi phi va giam tai cho EC2 micro.
 - Web/API chay qua HTTP bang public IP cua EC2. Khi co domain, co the them HTTPS sau.
 
 Theo tai lieu AWS hien tai, RDS Free Tier co 750 gio/thang cho Single-AZ `db.t3.micro`/`db.t4g.micro` voi PostgreSQL. EC2 Free Tier phu thuoc thoi diem tao account va loai instance duoc danh dau eligible trong account cua ban. Hay bat Billing Alert truoc khi deploy.
@@ -115,14 +115,35 @@ Neu workflow fail o buoc `Upload release to EC2`, kiem tra:
 - Private key khong dat passphrase vi GitHub Actions chay non-interactive.
 - Security group EC2 dang mo port 22 cho IP cua GitHub runner. Neu `admin_ssh_cidr` chi la IP nha ban, GitHub runner se khong SSH duoc. De test nhanh co the tam mo `0.0.0.0/0`, deploy xong nen thu hep lai.
 
+Neu log la `Connection timed out during banner exchange`, port 22 da mo nhung EC2 khong tra SSH banner kip. Neu truoc do tung deploy bang Docker, instance `t3.micro` co the dang qua tai do build/container cu. Cach xu ly nhanh:
+
+```bash
+ssh -i ~/.ssh/a25_aws ubuntu@EC2_PUBLIC_IP
+sudo pkill -f docker || true
+sudo systemctl restart ssh
+```
+
+Neu khong SSH duoc tu may ban, vao AWS Console -> EC2 -> Instance state -> Reboot instance, doi 1-2 phut roi rerun workflow. Workflow hien build artifact tren GitHub runner; EC2 chi giai nen file, restart `a25-server` va nginx.
+
 ## 5. Seed du lieu test
 
 Neu can seed sau deploy:
 
 ```bash
 ssh -i ~/.ssh/a25_aws ubuntu@EC2_PUBLIC_IP
-cd /opt/a25/app
-docker compose -f docker-compose.aws.yml exec server pnpm run seed
+cd /opt/a25/server
+set -a
+. ./.env.production
+set +a
+node dist/database/seeds/seed.js
+```
+
+Kiem tra service:
+
+```bash
+sudo systemctl status a25-server
+sudo journalctl -u a25-server -f
+sudo nginx -t
 ```
 
 ## 6. Huy tai nguyen de khong ton tien

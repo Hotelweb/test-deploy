@@ -13,19 +13,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create release archive
-        run: |
-          tar \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='server/node_modules' \
-            --exclude='web/node_modules' \
-            --exclude='dist' \
-            --exclude='server/dist' \
-            --exclude='web/dist' \
-            -czf /tmp/a25-release.tgz .
+      - name: Enable pnpm
+        run: corepack enable
 
-      - name: Upload release to EC2
+      - name: Build server artifact
+        working-directory: server
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm prune --prod
+          tar -czf /tmp/a25-server.tgz package.json pnpm-lock.yaml dist node_modules
+
+      - name: Build web artifact
+        working-directory: web
+        env:
+          VITE_SERVER_URL: http://${{ secrets.SERVER_HOST }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+          tar -czf /tmp/a25-web.tgz dist
+
+      - name: Upload artifacts to EC2
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
@@ -39,25 +47,26 @@ jobs:
           printf '%s\n' "$SERVER_SSH_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > ~/.ssh/a25_aws
           chmod 600 ~/.ssh/a25_aws
 
-          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ConnectionAttempts=3 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
             if ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "echo ssh-ready"; then
               break
             fi
-            if [ "$attempt" = "10" ]; then
-              echo "Unable to connect to EC2 over SSH after 10 attempts."
+            if [ "$attempt" = "15" ]; then
+              echo "Unable to connect to EC2 over SSH after 15 attempts."
               echo "Check SERVER_HOST, SERVER_USER, SERVER_SSH_KEY, EC2 state, and security group port 22."
               exit 1
             fi
-            echo "SSH is not ready yet, retrying in 15 seconds..."
-            sleep 15
+            echo "SSH is not ready yet, retrying in 20 seconds..."
+            sleep 20
           done
 
-          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "sudo mkdir -p /opt/a25/app && sudo chown -R $SERVER_USER:$SERVER_USER /opt/a25"
-          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-release.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-release.tgz"
+          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "sudo mkdir -p /opt/a25 /opt/a25/server /var/www/a25 && sudo chown -R $SERVER_USER:$SERVER_USER /opt/a25 /var/www/a25"
+          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-server.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-server.tgz"
+          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-web.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-web.tgz"
 
-      - name: Deploy containers
+      - name: Deploy with systemd and nginx
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
@@ -78,16 +87,19 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
         run: |
-          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=20"
+          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ConnectionAttempts=3 -o ServerAliveInterval=30 -o ServerAliveCountMax=20"
 
           write_env() {
             local key="$1"
             local value="${2:-}"
-            value="${value//\'/\'\\\'\'}"
-            printf "%s='%s'\n" "$key" "$value" >> /tmp/a25.env.production
+            value="${value//\\/\\\\}"
+            value="${value//\"/\\\"}"
+            printf '%s="%s"\n' "$key" "$value" >> /tmp/a25.env.production
           }
 
           : > /tmp/a25.env.production
+          write_env NODE_ENV production
+          write_env PORT 3000
           write_env PUBLIC_API_URL "http://${SERVER_HOST}"
           write_env FRONTEND_URL "http://${SERVER_HOST}"
           write_env DB_HOST "$DB_HOST"
@@ -107,25 +119,103 @@ jobs:
           write_env SYSTEM_ADMIN_PASSWORD "$SYSTEM_ADMIN_PASSWORD"
           write_env SYSTEM_ADMIN_NAME "$SYSTEM_ADMIN_NAME"
 
-          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25.env.production "$SERVER_USER@$SERVER_HOST:/opt/a25/.env.production"
+          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25.env.production "$SERVER_USER@$SERVER_HOST:/opt/a25/.env.production"
 
           ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
           set -euo pipefail
-          cd /opt/a25/app
-          tar -xzf /opt/a25/a25-release.tgz
-          cp /opt/a25/.env.production .env.production
 
-          if ! swapon --show | grep -q /swapfile; then
-            sudo fallocate -l 2G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-            grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+          if ! command -v node >/dev/null 2>&1 || ! node -v | grep -q '^v22\.'; then
+            curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+            sudo apt-get install -y nodejs
           fi
 
-          docker compose --env-file .env.production -f docker-compose.aws.yml build server
-          docker compose --env-file .env.production -f docker-compose.aws.yml build web
-          docker compose --env-file .env.production -f docker-compose.aws.yml up -d --no-build --remove-orphans
-          docker compose --env-file .env.production -f docker-compose.aws.yml exec -T server pnpm run migrate
-          docker compose --env-file .env.production -f docker-compose.aws.yml ps
+          if ! command -v nginx >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y nginx
+          fi
+
+          if command -v docker >/dev/null 2>&1; then
+            sudo docker ps -q --filter publish=80 | xargs -r sudo docker stop
+            sudo docker ps -q --filter publish=3000 | xargs -r sudo docker stop
+          fi
+
+          sudo mkdir -p /opt/a25/server /var/www/a25
+          sudo chown -R ubuntu:ubuntu /opt/a25 /var/www/a25
+
+          rm -rf /opt/a25/server/*
+          tar -xzf /opt/a25/a25-server.tgz -C /opt/a25/server
+
+          rm -rf /var/www/a25/*
+          tar -xzf /opt/a25/a25-web.tgz -C /var/www/a25
+          mv /var/www/a25/dist/* /var/www/a25/
+          rmdir /var/www/a25/dist
+
+          cp /opt/a25/.env.production /opt/a25/server/.env.production
+
+          sudo tee /etc/systemd/system/a25-server.service >/dev/null <<'SERVICE'
+          [Unit]
+          Description=A25 NestJS server
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=ubuntu
+          WorkingDirectory=/opt/a25/server
+          EnvironmentFile=/opt/a25/server/.env.production
+          ExecStart=/usr/bin/node /opt/a25/server/dist/main.js
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+
+          sudo tee /etc/nginx/sites-available/a25 >/dev/null <<'NGINX'
+          server {
+            listen 80 default_server;
+            listen [::]:80 default_server;
+            server_name _;
+
+            root /var/www/a25;
+            index index.html;
+            client_max_body_size 20m;
+
+            location /socket.io/ {
+              proxy_pass http://127.0.0.1:3000/socket.io/;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+            }
+
+            location ~ ^/(auth|hotels|hotel-users|services|chat|food-order|uploads|api/docs)(/|$) {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_http_version 1.1;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+            }
+
+            location / {
+              try_files $uri $uri/ /index.html;
+            }
+          }
+          NGINX
+
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo ln -sfn /etc/nginx/sites-available/a25 /etc/nginx/sites-enabled/a25
+          sudo nginx -t
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable a25-server
+          sudo systemctl restart a25-server
+          sudo systemctl enable nginx
+          sudo systemctl restart nginx
+
+          sudo systemctl --no-pager --full status a25-server
           REMOTE
