@@ -39,7 +39,7 @@ jobs:
           printf '%s\n' "$SERVER_SSH_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > ~/.ssh/a25_aws
           chmod 600 ~/.ssh/a25_aws
 
-          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
             if ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "echo ssh-ready"; then
@@ -55,7 +55,7 @@ jobs:
           done
 
           ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "sudo mkdir -p /opt/a25/app && sudo chown -R $SERVER_USER:$SERVER_USER /opt/a25"
-          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 /tmp/a25-release.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-release.tgz"
+          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-release.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-release.tgz"
 
       - name: Deploy containers
         env:
@@ -78,33 +78,54 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
         run: |
-          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30"
-          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" \
-            "DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' DB_NAME='$DB_NAME' JWT_SECRET='$JWT_SECRET' CLOUDINARY_CLOUD_NAME='$CLOUDINARY_CLOUD_NAME' CLOUDINARY_API_KEY='$CLOUDINARY_API_KEY' CLOUDINARY_API_SECRET='$CLOUDINARY_API_SECRET' CLOUDINARY_FOLDER='${CLOUDINARY_FOLDER:-a25}' GOOGLE_TRANSLATE_API_KEY='$GOOGLE_TRANSLATE_API_KEY' OPENAI_API_KEY='$OPENAI_API_KEY' DEEPL_API_KEY='$DEEPL_API_KEY' SYSTEM_ADMIN_EMAIL='$SYSTEM_ADMIN_EMAIL' SYSTEM_ADMIN_PASSWORD='$SYSTEM_ADMIN_PASSWORD' SYSTEM_ADMIN_NAME='$SYSTEM_ADMIN_NAME' SERVER_HOST='$SERVER_HOST' bash -s" <<'REMOTE'
+          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=20"
+
+          write_env() {
+            local key="$1"
+            local value="${2:-}"
+            value="${value//\'/\'\\\'\'}"
+            printf "%s='%s'\n" "$key" "$value" >> /tmp/a25.env.production
+          }
+
+          : > /tmp/a25.env.production
+          write_env PUBLIC_API_URL "http://${SERVER_HOST}"
+          write_env FRONTEND_URL "http://${SERVER_HOST}"
+          write_env DB_HOST "$DB_HOST"
+          write_env DB_PORT "$DB_PORT"
+          write_env DB_USERNAME "$DB_USERNAME"
+          write_env DB_PASSWORD "$DB_PASSWORD"
+          write_env DB_NAME "$DB_NAME"
+          write_env JWT_SECRET "$JWT_SECRET"
+          write_env CLOUDINARY_CLOUD_NAME "$CLOUDINARY_CLOUD_NAME"
+          write_env CLOUDINARY_API_KEY "$CLOUDINARY_API_KEY"
+          write_env CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET"
+          write_env CLOUDINARY_FOLDER "${CLOUDINARY_FOLDER:-a25}"
+          write_env GOOGLE_TRANSLATE_API_KEY "$GOOGLE_TRANSLATE_API_KEY"
+          write_env OPENAI_API_KEY "$OPENAI_API_KEY"
+          write_env DEEPL_API_KEY "$DEEPL_API_KEY"
+          write_env SYSTEM_ADMIN_EMAIL "$SYSTEM_ADMIN_EMAIL"
+          write_env SYSTEM_ADMIN_PASSWORD "$SYSTEM_ADMIN_PASSWORD"
+          write_env SYSTEM_ADMIN_NAME "$SYSTEM_ADMIN_NAME"
+
+          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25.env.production "$SERVER_USER@$SERVER_HOST:/opt/a25/.env.production"
+
+          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
           set -euo pipefail
           cd /opt/a25/app
           tar -xzf /opt/a25/a25-release.tgz
+          cp /opt/a25/.env.production .env.production
 
-          cat > .env.production <<ENV
-          PUBLIC_API_URL=http://${SERVER_HOST}
-          FRONTEND_URL=http://${SERVER_HOST}
-          DB_HOST=${DB_HOST}
-          DB_PORT=${DB_PORT}
-          DB_USERNAME=${DB_USERNAME}
-          DB_PASSWORD=${DB_PASSWORD}
-          DB_NAME=${DB_NAME}
-          JWT_SECRET=${JWT_SECRET}
-          CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
-          CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
-          CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
-          CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER}
-          GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY}
-          SYSTEM_ADMIN_EMAIL=${SYSTEM_ADMIN_EMAIL}
-          SYSTEM_ADMIN_PASSWORD=${SYSTEM_ADMIN_PASSWORD}
-          SYSTEM_ADMIN_NAME=${SYSTEM_ADMIN_NAME}
-          ENV
+          if ! swapon --show | grep -q /swapfile; then
+            sudo fallocate -l 2G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+          fi
 
-          docker compose -f docker-compose.aws.yml up -d --build
-          docker compose -f docker-compose.aws.yml exec -T server pnpm run migrate
-          docker compose -f docker-compose.aws.yml ps
+          docker compose --env-file .env.production -f docker-compose.aws.yml build server
+          docker compose --env-file .env.production -f docker-compose.aws.yml build web
+          docker compose --env-file .env.production -f docker-compose.aws.yml up -d --no-build --remove-orphans
+          docker compose --env-file .env.production -f docker-compose.aws.yml exec -T server pnpm run migrate
+          docker compose --env-file .env.production -f docker-compose.aws.yml ps
           REMOTE
