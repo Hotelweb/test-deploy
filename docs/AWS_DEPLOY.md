@@ -134,9 +134,6 @@ Neu can seed sau deploy:
 ssh -i ~/.ssh/a25_aws ubuntu@EC2_PUBLIC_IP
 cd /opt/a25/server
 echo 'DB_SSL="true"' >> .env.production
-set -a
-. ./.env.production
-set +a
 node dist/database/seeds/seed.js
 ```
 

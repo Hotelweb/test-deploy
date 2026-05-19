@@ -3,7 +3,7 @@ import { join } from 'path';
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ path: ['.env.production', '.env.local', '.env'] });
 
 /**
  * Tiny one-off migration runner.

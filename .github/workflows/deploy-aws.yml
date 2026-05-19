@@ -97,9 +97,8 @@ jobs:
           write_env() {
             local key="$1"
             local value="${2:-}"
-            value="${value//\\/\\\\}"
-            value="${value//\"/\\\"}"
-            printf '%s="%s"\n' "$key" "$value" >> /tmp/a25.env.production
+            value="${value//\'/\'\\\'\'}"
+            printf "%s='%s'\n" "$key" "$value" >> /tmp/a25.env.production
           }
 
           : > /tmp/a25.env.production

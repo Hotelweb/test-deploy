@@ -2,7 +2,7 @@ import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import * as bcrypt from 'bcryptjs';
 
-dotenv.config();
+dotenv.config({ path: ['.env.production', '.env.local', '.env'] });
 
 const dataSource = new DataSource({
   type: 'postgres',
