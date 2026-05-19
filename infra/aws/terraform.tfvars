@@ -1,4 +1,4 @@
 aws_region          = "ap-southeast-1"
 project_name        = "a25-test"
-admin_ssh_cidr      = "YOUR_PUBLIC_IP/32"
+admin_ssh_cidr      = "171.238.213.188/32"
 ssh_public_key_path = "~/.ssh/a25_aws.pub"
