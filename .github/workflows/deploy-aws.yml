@@ -1,0 +1,92 @@
+name: Deploy to AWS test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create release archive
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='server/node_modules' \
+            --exclude='web/node_modules' \
+            --exclude='dist' \
+            --exclude='server/dist' \
+            --exclude='web/dist' \
+            -czf /tmp/a25-release.tgz .
+
+      - name: Upload release to EC2
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/a25_aws
+          chmod 600 ~/.ssh/a25_aws
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/a25_aws "$SERVER_USER@$SERVER_HOST" "mkdir -p /opt/a25/app"
+          scp -i ~/.ssh/a25_aws /tmp/a25-release.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-release.tgz"
+
+      - name: Deploy containers
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOUDINARY_FOLDER: ${{ secrets.CLOUDINARY_FOLDER }}
+          GOOGLE_TRANSLATE_API_KEY: ${{ secrets.GOOGLE_TRANSLATE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+          SYSTEM_ADMIN_EMAIL: ${{ secrets.SYSTEM_ADMIN_EMAIL }}
+          SYSTEM_ADMIN_PASSWORD: ${{ secrets.SYSTEM_ADMIN_PASSWORD }}
+          SYSTEM_ADMIN_NAME: ${{ secrets.SYSTEM_ADMIN_NAME }}
+        run: |
+          ssh -i ~/.ssh/a25_aws "$SERVER_USER@$SERVER_HOST" \
+            "DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' DB_NAME='$DB_NAME' JWT_SECRET='$JWT_SECRET' CLOUDINARY_CLOUD_NAME='$CLOUDINARY_CLOUD_NAME' CLOUDINARY_API_KEY='$CLOUDINARY_API_KEY' CLOUDINARY_API_SECRET='$CLOUDINARY_API_SECRET' CLOUDINARY_FOLDER='${CLOUDINARY_FOLDER:-a25}' GOOGLE_TRANSLATE_API_KEY='$GOOGLE_TRANSLATE_API_KEY' OPENAI_API_KEY='$OPENAI_API_KEY' DEEPL_API_KEY='$DEEPL_API_KEY' SYSTEM_ADMIN_EMAIL='$SYSTEM_ADMIN_EMAIL' SYSTEM_ADMIN_PASSWORD='$SYSTEM_ADMIN_PASSWORD' SYSTEM_ADMIN_NAME='$SYSTEM_ADMIN_NAME' SERVER_HOST='$SERVER_HOST' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a25/app
+          tar -xzf /opt/a25/a25-release.tgz
+
+          cat > .env.production <<ENV
+          PUBLIC_API_URL=http://${SERVER_HOST}
+          FRONTEND_URL=http://${SERVER_HOST}
+          DB_HOST=${DB_HOST}
+          DB_PORT=${DB_PORT}
+          DB_USERNAME=${DB_USERNAME}
+          DB_PASSWORD=${DB_PASSWORD}
+          DB_NAME=${DB_NAME}
+          JWT_SECRET=${JWT_SECRET}
+          CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+          CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+          CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+          CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER}
+          GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY}
+          OPENAI_API_KEY=${OPENAI_API_KEY}
+          DEEPL_API_KEY=${DEEPL_API_KEY}
+          SYSTEM_ADMIN_EMAIL=${SYSTEM_ADMIN_EMAIL}
+          SYSTEM_ADMIN_PASSWORD=${SYSTEM_ADMIN_PASSWORD}
+          SYSTEM_ADMIN_NAME=${SYSTEM_ADMIN_NAME}
+          ENV
+
+          docker compose -f docker-compose.aws.yml up -d --build
+          docker compose -f docker-compose.aws.yml exec -T server pnpm run migrate
+          docker compose -f docker-compose.aws.yml ps
+          REMOTE
