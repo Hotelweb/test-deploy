@@ -125,6 +125,7 @@ export class HotelsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
+  @RequireScopes('system', 'hotel')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update hotel details',

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { getHotel, type Hotel } from '../api'
+import { EditHotelModal } from '../components/EditHotelModal'
 import { UserMenu } from '../components/UserMenu'
 import {
   ArrowRightIcon,
   ChatIcon,
+  EditIcon,
   EyeIcon,
   HotelIcon,
   InRoomDiningIcon,
@@ -21,6 +23,7 @@ export function HotelAdminHomePage() {
   const [hotel, setHotel] = useState<Hotel | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingHotel, setEditingHotel] = useState(false)
 
   const loadHotel = useCallback(async () => {
     if (!hotelId) return
@@ -49,6 +52,16 @@ export function HotelAdminHomePage() {
   if (!hotelId) return <Navigate to="/admin" replace />
 
   const actions = [
+    {
+      title: 'Chỉnh sửa thông tin',
+      description:
+        'Cập nhật tên khách sạn, liên hệ, địa chỉ, giới thiệu, logo, banner và thư viện ảnh.',
+      buttonLabel: 'Sửa thông tin',
+      icon: EditIcon,
+      tone: 'bg-violet-50 text-violet-700 border-violet-100',
+      onClick: () => setEditingHotel(true),
+      disabled: !hotel,
+    },
     {
       title: 'Chat với khách',
       description: 'Theo dõi hội thoại, trả lời yêu cầu và cập nhật trạng thái đặt phòng.',
@@ -184,6 +197,16 @@ export function HotelAdminHomePage() {
           )}
         </div>
       </main>
+
+      <EditHotelModal
+        open={editingHotel}
+        hotel={hotel}
+        onClose={() => setEditingHotel(false)}
+        onSaved={(saved) => {
+          setHotel(saved)
+          setEditingHotel(false)
+        }}
+      />
     </div>
   )
 }

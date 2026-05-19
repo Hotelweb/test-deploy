@@ -25,9 +25,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
             url: databaseUrl,
             entities: [__dirname + '/../**/*.entity{.ts,.js}'],
             synchronize,
-            ssl: {
-              rejectUnauthorized: false,
-            },
+            ssl: ssl ? { rejectUnauthorized: false } : false,
           };
         }
 
