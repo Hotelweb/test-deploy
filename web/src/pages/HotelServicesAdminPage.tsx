@@ -7,8 +7,8 @@ import {
   type AdminHotelService,
   type Hotel,
 } from '../api'
-import { ServiceFormModal } from '../components/ServiceFormModal'
-import { ServiceDetailModal } from '../components/ServiceDetailModal'
+import { ServiceFormModal } from '../components/services/ServiceFormModal'
+import { ServiceDetailModal } from '../components/services/ServiceDetailModal'
 import { UserMenu } from '../components/UserMenu'
 import { getIconEntry, isIconUrl } from '../lib/serviceCatalog'
 import {

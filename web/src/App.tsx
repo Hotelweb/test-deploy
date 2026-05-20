@@ -7,7 +7,9 @@ const HotelDetailPage = lazy(() =>
   import('./pages/HotelDetailPage').then(({ HotelDetailPage }) => ({ default: HotelDetailPage })),
 )
 const FoodOrderPage = lazy(() =>
-  import('./pages/FoodOrderPage').then(({ FoodOrderPage }) => ({ default: FoodOrderPage })),
+  import('./pages/food-order/FoodOrderPage').then(({ FoodOrderPage }) => ({
+    default: FoodOrderPage,
+  })),
 )
 const LoginPage = lazy(() =>
   import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })),
@@ -29,7 +31,7 @@ const HotelServicesAdminPage = lazy(() =>
   })),
 )
 const FoodOrderAdminPage = lazy(() =>
-  import('./pages/FoodOrderAdminPage').then(({ FoodOrderAdminPage }) => ({
+  import('./pages/food-order/admin/FoodOrderAdminPage').then(({ FoodOrderAdminPage }) => ({
     default: FoodOrderAdminPage,
   })),
 )

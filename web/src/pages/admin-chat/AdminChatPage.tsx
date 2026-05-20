@@ -1,8 +1,8 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { AdminChatConversation } from './AdminChatConversation'
-import { AdminChatSidebar } from './AdminChatSidebar'
-import { EmptyState } from './EmptyState'
-import { useAdminChat } from './useAdminChat'
+import { AdminChatConversation } from './components/AdminChatConversation'
+import { AdminChatSidebar } from './components/AdminChatSidebar'
+import { EmptyState } from './components/EmptyState'
+import { useAdminChat } from './hooks/useAdminChat'
 
 export function AdminChatPage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()

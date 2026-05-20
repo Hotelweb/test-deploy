@@ -21,7 +21,7 @@ import {
   TourTicketIcon,
   TranslateIcon,
 } from '../components/icons/ServiceIcons'
-import type { ServiceTone } from '../components/ServiceItem'
+import type { ServiceTone } from '../components/services/ServiceItem'
 import type { ServiceLanguage } from '../api'
 
 /**
