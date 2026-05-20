@@ -1,44 +1,47 @@
 import { useState } from 'react'
 import { t } from '../../lib/i18n'
-import { ArrowLeftIcon, ArrowRightIcon, CalendarIcon, UserCircleIcon } from '../icons/ServiceIcons'
+import { LANGUAGE_BY_CODE } from '../../lib/languages'
 
 export interface BookingFormValue {
   customer_name: string
-  customer_phone?: string
-  customer_email?: string
-  customer_country?: string
-  guest_count?: number
-  check_in_date?: string
-  check_out_date?: string
-  room_type?: string
-  initial_request?: string
+  customer_first_name: string
+  customer_last_name?: string
+  customer_email: string
+  room_number?: string
+  privacy_consent: boolean
+  analytics_consent?: boolean
 }
 
 interface BookingFormProps {
+  hotelName: string
   language: string
   onSubmit: (value: BookingFormValue) => void
   onSkip: () => void
-  onBack: () => void
+  onBack?: () => void
   loading?: boolean
 }
 
-export function BookingForm({ language, onSubmit, onSkip, onBack, loading }: BookingFormProps) {
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
+export function BookingForm({ hotelName, language, onSubmit, onSkip, loading }: BookingFormProps) {
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
-  const [country, setCountry] = useState('')
-  const [guests, setGuests] = useState<number>(2)
-  const [checkin, setCheckin] = useState('')
-  const [checkout, setCheckout] = useState('')
-  const [roomType, setRoomType] = useState('')
-  const [message, setMessage] = useState('')
-  const [errors, setErrors] = useState<{ name?: string; email?: string }>({})
+  const [roomNumber, setRoomNumber] = useState('')
+  const [privacyConsent, setPrivacyConsent] = useState(false)
+  const [analyticsConsent, setAnalyticsConsent] = useState(false)
+  const [errors, setErrors] = useState<{
+    firstName?: string
+    email?: string
+    privacyConsent?: string
+  }>({})
 
   const validate = () => {
     const next: typeof errors = {}
-    if (!name.trim()) next.name = t(language, 'form.required')
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    if (!firstName.trim()) next.firstName = t(language, 'form.required')
+    if (!email.trim()) next.email = t(language, 'form.required')
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       next.email = t(language, 'form.invalid_email')
+    }
+    if (!privacyConsent) next.privacyConsent = t(language, 'form.required')
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -46,223 +49,197 @@ export function BookingForm({ language, onSubmit, onSkip, onBack, loading }: Boo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
+
+    const trimmedFirstName = firstName.trim()
+    const trimmedLastName = lastName.trim()
+    const customerName = [trimmedFirstName, trimmedLastName].filter(Boolean).join(' ')
+
     onSubmit({
-      customer_name: name.trim(),
-      customer_phone: phone.trim() || undefined,
-      customer_email: email.trim() || undefined,
-      customer_country: country.trim() || undefined,
-      guest_count: Number.isFinite(guests) ? guests : undefined,
-      check_in_date: checkin || undefined,
-      check_out_date: checkout || undefined,
-      room_type: roomType.trim() || undefined,
-      initial_request: message.trim() || undefined,
+      customer_name: customerName,
+      customer_first_name: trimmedFirstName,
+      customer_last_name: trimmedLastName || undefined,
+      customer_email: email.trim(),
+      room_number: roomNumber.trim() || undefined,
+      privacy_consent: true,
+      analytics_consent: analyticsConsent,
     })
   }
 
+  const languageChips = [language, 'zh', 'ko']
+    .filter((code, index, codes) => codes.indexOf(code) === index)
+    .map((code) => LANGUAGE_BY_CODE[code])
+    .filter(Boolean)
+    .slice(0, 3)
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-b from-white to-gray-50/60"
-    >
-      <div className="px-5 pt-5 pb-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-text-muted cursor-pointer"
-          aria-label={t(language, 'common.back')}
-        >
-          <ArrowLeftIcon className="w-5 h-5" />
-        </button>
-        <div className="min-w-0">
-          <h3 className="text-[16px] font-bold text-text leading-tight">
-            {t(language, 'form.title')}
-          </h3>
-          <p className="text-[12px] text-text-light leading-snug mt-0.5">
-            {t(language, 'form.subtitle')}
-          </p>
+    <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto bg-gray-100 px-5 py-6">
+      <div className="mx-auto max-w-[326px] rounded-lg bg-white px-6 py-7 shadow-2xl">
+        <h2 className="text-center text-[23px] font-extrabold leading-[1.15] tracking-wide text-[#303238] uppercase">
+          {hotelName}
+        </h2>
+
+        <div className="mt-6 grid grid-cols-3 gap-2" aria-label="Detected language">
+          {languageChips.map((langOption) => {
+            const isActive = langOption.code === language
+            return (
+              <div
+                key={langOption.code}
+                className={`flex h-[42px] items-center justify-center rounded border px-2 text-[14px] font-medium ${
+                  isActive
+                    ? 'border-[#9da873] bg-[#9da873] text-white'
+                    : 'border-[#c7c7c7] bg-white text-[#171717]'
+                }`}
+              >
+                {langOption.code === 'en'
+                  ? 'ENGLISH'
+                  : langOption.code === 'zh'
+                    ? '简体中文'
+                    : langOption.nativeName}
+              </div>
+            )
+          })}
         </div>
-      </div>
 
-      <div className="px-5 pb-3 grid gap-3">
-        <Field label={t(language, 'form.name')} required error={errors.name}>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-lighter pointer-events-none">
-              <UserCircleIcon className="w-4 h-4" />
-            </span>
-            <input
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t(language, 'form.name_placeholder')}
-              className={inputCls(errors.name)}
-              style={{ paddingLeft: '2.25rem' }}
-              required
-            />
+        <div className="mt-6 space-y-5">
+          <div>
+            <FormLabel label="NAME" status="MANDATORY" />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First name"
+                className={inputCls(errors.firstName)}
+                required
+              />
+              <input
+                type="text"
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                className={inputCls()}
+              />
+            </div>
+            {errors.firstName ? <ErrorText>{errors.firstName}</ErrorText> : null}
           </div>
-        </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t(language, 'form.phone')}>
-            <input
-              type="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={t(language, 'form.phone_placeholder')}
-              className={inputCls()}
-            />
-          </Field>
-          <Field label={t(language, 'form.email')} error={errors.email}>
+          <div>
+            <FormLabel label="EMAIL ADDRESS" status="MANDATORY" />
             <input
               type="email"
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={t(language, 'form.email_placeholder')}
+              placeholder="Email address"
               className={inputCls(errors.email)}
+              required
             />
-          </Field>
-        </div>
+            {errors.email ? <ErrorText>{errors.email}</ErrorText> : null}
+          </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t(language, 'form.country')}>
+          <div>
+            <FormLabel label="ROOM NUMBER" status="OPTIONAL" muted />
             <input
               type="text"
-              autoComplete="country-name"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              placeholder={t(language, 'form.country_placeholder')}
+              inputMode="numeric"
+              autoComplete="off"
+              value={roomNumber}
+              onChange={(e) => setRoomNumber(e.target.value)}
+              placeholder="E.g. 504"
               className={inputCls()}
             />
-          </Field>
-          <Field label={t(language, 'form.guests')}>
-            <select
-              value={guests}
-              onChange={(e) => setGuests(Number(e.target.value))}
-              className={selectCls()}
-            >
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </Field>
+          </div>
+
+          <div className="space-y-3 text-[15px] leading-7 text-[#6a6b70]">
+            <Checkbox
+              checked={privacyConsent}
+              onChange={setPrivacyConsent}
+              required
+              label={
+                <>
+                  I agree to the <a className="text-[#1a73e8]">privacy policy</a> and understand
+                  that a copy of this conversation will be sent to me by email
+                </>
+              }
+            />
+            {errors.privacyConsent ? <ErrorText>{errors.privacyConsent}</ErrorText> : null}
+
+            <Checkbox
+              checked={analyticsConsent}
+              onChange={setAnalyticsConsent}
+              label="I agree that your company may collect data from any and all conversations that take place on the chat for analytical purposes to improve its services"
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t(language, 'form.checkin')}>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-lighter pointer-events-none">
-                <CalendarIcon className="w-4 h-4" />
-              </span>
-              <input
-                type="date"
-                value={checkin}
-                onChange={(e) => setCheckin(e.target.value)}
-                className={inputCls()}
-                style={{ paddingLeft: '2.25rem' }}
-              />
-            </div>
-          </Field>
-          <Field label={t(language, 'form.checkout')}>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-lighter pointer-events-none">
-                <CalendarIcon className="w-4 h-4" />
-              </span>
-              <input
-                type="date"
-                value={checkout}
-                onChange={(e) => setCheckout(e.target.value)}
-                min={checkin || undefined}
-                className={inputCls()}
-                style={{ paddingLeft: '2.25rem' }}
-              />
-            </div>
-          </Field>
+        <div className="mt-8">
+          <button
+            type="submit"
+            disabled={loading}
+            className="h-12 w-full rounded-lg bg-[#2e6729] text-[18px] font-extrabold text-white transition hover:bg-[#275923] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? (
+              <span className="mx-auto block h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+            ) : (
+              'START CHAT SESSION'
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onSkip}
+            disabled={loading}
+            className="mt-2 h-8 w-full text-[14px] text-[#42444a] transition hover:text-black disabled:opacity-60"
+          >
+            Return to Home Page
+          </button>
         </div>
-
-        <Field label={t(language, 'form.room_type')}>
-          <input
-            type="text"
-            value={roomType}
-            onChange={(e) => setRoomType(e.target.value)}
-            placeholder={t(language, 'form.room_type_placeholder')}
-            className={inputCls()}
-          />
-        </Field>
-
-        <Field label={t(language, 'form.message')}>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder={t(language, 'form.message_placeholder')}
-            rows={3}
-            className="w-full px-3 py-2.5 rounded-xl bg-gray-50 text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white border border-border-light focus:border-primary/40 transition-all resize-none placeholder:text-text-lighter"
-          />
-        </Field>
-      </div>
-
-      <div className="px-5 pb-5 pt-2 sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent flex flex-col gap-2">
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full h-12 rounded-2xl gradient-primary text-white font-semibold text-[15px] flex items-center justify-center gap-2 hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
-        >
-          {loading ? (
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <>
-              {t(language, 'form.start_chat')}
-              <ArrowRightIcon className="w-4 h-4" />
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={onSkip}
-          disabled={loading}
-          className="w-full h-10 rounded-2xl text-text-light hover:text-text text-[13px] font-medium transition-colors duration-200 cursor-pointer"
-        >
-          {t(language, 'form.skip_to_chat')}
-        </button>
       </div>
     </form>
   )
 }
 
-function Field({
+function FormLabel({ label, status, muted }: { label: string; status: string; muted?: boolean }) {
+  return (
+    <div className="mb-1.5 flex items-center justify-between text-[12px] font-medium">
+      <span className="text-[#4b4d52]">{label}</span>
+      <span className={muted ? 'text-[#4b4d52]' : 'text-[#d92338]'}>{status}</span>
+    </div>
+  )
+}
+
+function Checkbox({
+  checked,
+  onChange,
   label,
   required,
-  error,
-  children,
 }: {
-  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: React.ReactNode
   required?: boolean
-  error?: string
-  children: React.ReactNode
 }) {
   return (
-    <label className="block">
-      <span className="block text-[12px] font-semibold text-text-muted mb-1.5">
-        {label}
-        {required ? <span className="text-red-500 ml-0.5">*</span> : null}
-      </span>
-      {children}
-      {error ? <span className="block text-[11px] text-red-600 mt-1">{error}</span> : null}
+    <label className="flex items-start gap-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        required={required}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-1 h-4 w-4 shrink-0 appearance-none rounded border border-[#c9cdd2] bg-white checked:border-[#2e6729] checked:bg-[#2e6729]"
+      />
+      <span>{label}</span>
     </label>
   )
 }
 
-function inputCls(error?: string) {
-  return `w-full px-3 py-2.5 rounded-xl bg-gray-50 text-[14px] focus:outline-none focus:ring-2 ${
-    error
-      ? 'ring-red-200 border-red-300'
-      : 'focus:ring-primary/30 focus:bg-white focus:border-primary/40 border-border-light'
-  } border transition-all placeholder:text-text-lighter`
+function ErrorText({ children }: { children: React.ReactNode }) {
+  return <span className="mt-1 block text-[11px] text-[#d92338]">{children}</span>
 }
 
-function selectCls() {
-  return 'w-full px-3 py-2.5 rounded-xl bg-gray-50 text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white border border-border-light focus:border-primary/40 transition-all cursor-pointer'
+function inputCls(error?: string) {
+  return `h-[40px] w-full rounded border bg-white px-2.5 text-[15px] text-[#333] outline-none placeholder:text-[#858585] focus:border-[#2e6729] focus:ring-1 focus:ring-[#2e6729] ${
+    error ? 'border-[#d92338]' : 'border-[#777]'
+  }`
 }

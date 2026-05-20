@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  Equals,
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsInt,
@@ -8,6 +10,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateSessionDto {
@@ -29,15 +32,25 @@ export class CreateSessionDto {
   @IsString()
   customer_name?: string;
 
+  @ApiPropertyOptional({ example: 'John' })
+  @ValidateIf((dto: CreateSessionDto) => !dto.customer_name)
+  @IsString()
+  @IsNotEmpty()
+  customer_first_name?: string;
+
+  @ApiPropertyOptional({ example: 'Doe' })
+  @IsOptional()
+  @IsString()
+  customer_last_name?: string;
+
   @ApiPropertyOptional({ example: '0901234567' })
   @IsOptional()
   @IsString()
   customer_phone?: string;
 
-  @ApiPropertyOptional({ example: 'guest@example.com' })
-  @IsOptional()
+  @ApiProperty({ example: 'guest@example.com' })
   @IsEmail()
-  customer_email?: string;
+  customer_email: string;
 
   @ApiPropertyOptional({ example: 'Vietnam' })
   @IsOptional()
@@ -74,6 +87,22 @@ export class CreateSessionDto {
   @IsOptional()
   @IsString()
   initial_request?: string;
+
+  @ApiProperty({
+    example: true,
+    description: 'Customer accepted the privacy policy before starting chat',
+  })
+  @IsBoolean()
+  @Equals(true, { message: 'privacy_consent must be accepted' })
+  privacy_consent: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Customer consented to analytical use of chat data',
+  })
+  @IsOptional()
+  @IsBoolean()
+  analytics_consent?: boolean;
 }
 
 export class SendMessageDto {

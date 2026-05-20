@@ -5,11 +5,13 @@ import { FoodOrder, FoodOrderItem } from './entities/food-order.entity.js';
 import { FoodOrderService } from './food-order.service.js';
 import { FoodOrderController } from './food-order.controller.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { ChatModule } from '../chat/chat.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([MenuItem, FoodOrder, FoodOrderItem]),
     AuthModule,
+    ChatModule,
   ],
   controllers: [FoodOrderController],
   providers: [FoodOrderService],

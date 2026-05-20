@@ -164,6 +164,8 @@ export interface ChatSession {
   customer_token: string
   customer_language: string
   customer_name: string | null
+  customer_first_name: string | null
+  customer_last_name: string | null
   customer_phone: string | null
   customer_email: string | null
   customer_country: string | null
@@ -173,6 +175,8 @@ export interface ChatSession {
   check_out_date: string | null
   guest_count: number | null
   initial_request: string | null
+  privacy_consent: boolean
+  analytics_consent: boolean
   status: ChatSessionStatus
   unread_count: number
   last_message_at: string | null
@@ -204,8 +208,10 @@ export interface CreateSessionInput {
   hotel_id: number
   customer_language: string
   customer_name?: string
+  customer_first_name?: string
+  customer_last_name?: string
   customer_phone?: string
-  customer_email?: string
+  customer_email: string
   customer_country?: string
   room_number?: string
   room_type?: string
@@ -213,6 +219,8 @@ export interface CreateSessionInput {
   check_out_date?: string
   guest_count?: number
   initial_request?: string
+  privacy_consent: boolean
+  analytics_consent?: boolean
 }
 
 // Hotel APIs

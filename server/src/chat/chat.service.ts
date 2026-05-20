@@ -34,11 +34,23 @@ export class ChatService {
   // ---------------------------------------------------------------------------
 
   async createSession(dto: CreateSessionDto): Promise<CustomerSession> {
+    const derivedCustomerName = [
+      dto.customer_first_name,
+      dto.customer_last_name,
+    ]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(' ');
+    const customerName =
+      dto.customer_name?.trim() || derivedCustomerName || undefined;
+
     const sessionData: Partial<CustomerSession> = {
       hotel_id: dto.hotel_id,
       customer_token: randomUUID(),
       customer_language: dto.customer_language,
-      customer_name: dto.customer_name,
+      customer_name: customerName,
+      customer_first_name: dto.customer_first_name,
+      customer_last_name: dto.customer_last_name,
       customer_phone: dto.customer_phone,
       customer_email: dto.customer_email,
       customer_country: dto.customer_country,
@@ -48,6 +60,8 @@ export class ChatService {
       check_out_date: dto.check_out_date,
       guest_count: dto.guest_count,
       initial_request: dto.initial_request,
+      privacy_consent: dto.privacy_consent ?? false,
+      analytics_consent: dto.analytics_consent ?? false,
       status: ChatSessionStatus.OPEN,
     };
     const session = this.sessionRepo.create(sessionData);

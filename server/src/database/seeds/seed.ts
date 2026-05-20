@@ -255,6 +255,8 @@ async function seed() {
         customer_token UUID NOT NULL,
         assigned_user_id BIGINT,
         customer_name VARCHAR(100),
+        customer_first_name VARCHAR(50),
+        customer_last_name VARCHAR(50),
         customer_phone VARCHAR(20),
         customer_email VARCHAR(255),
         customer_country VARCHAR(80),
@@ -264,6 +266,8 @@ async function seed() {
         check_out_date DATE,
         guest_count INT,
         initial_request TEXT,
+        privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
+        analytics_consent BOOLEAN NOT NULL DEFAULT FALSE,
         customer_language language_code NOT NULL,
         status chat_session_status NOT NULL DEFAULT 'OPEN',
         unread_count INT NOT NULL DEFAULT 0,
@@ -272,6 +276,14 @@ async function seed() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE customer_sessions
+        ADD COLUMN IF NOT EXISTS customer_first_name VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS customer_last_name VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS analytics_consent BOOLEAN NOT NULL DEFAULT FALSE;
     `);
 
     // Chat Messages — every utterance, with its translation pipeline state.

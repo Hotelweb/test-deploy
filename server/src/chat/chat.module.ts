@@ -14,6 +14,6 @@ import { TranslationService } from './translation.service.js';
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatGateway, TranslationService],
-  exports: [ChatService, TranslationService],
+  exports: [ChatService, ChatGateway, TranslationService],
 })
 export class ChatModule {}

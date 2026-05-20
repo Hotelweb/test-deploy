@@ -7,9 +7,12 @@ import {
 } from '../../api'
 import type { ChatMessage, ChatSession } from '../../api'
 import { useChatSocket } from '../../hooks/useChatSocket'
-import { getLanguage } from '../../lib/languages'
+import {
+  ensureGuestNotificationPermission,
+  rememberGuestSession,
+} from '../../hooks/useGuestFaviconNotifications'
+import { detectPreferredLanguage, getLanguage } from '../../lib/languages'
 import { t } from '../../lib/i18n'
-import { LanguagePicker } from './LanguagePicker'
 import { BookingForm, type BookingFormValue } from './BookingForm'
 import { MessageBubble, type DisplayMessage } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
@@ -24,11 +27,11 @@ interface ChatWindowProps {
   onClose: () => void
 }
 
-type Step = 'language' | 'form' | 'chat'
+type Step = 'form' | 'chat'
 
 export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
-  const [step, setStep] = useState<Step>('language')
-  const [language, setLanguage] = useState<string | null>(null)
+  const [step, setStep] = useState<Step>('form')
+  const [language] = useState(() => detectPreferredLanguage())
   const [session, setSession] = useState<ChatSession | null>(null)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [loading, setLoading] = useState(false)
@@ -42,13 +45,13 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const lang = language ?? 'en'
+  const lang = language
 
   // -----------------------------------------------------------------------
-  // Try to resume an existing session for this hotel + language pair.
+  // Try to resume an existing session for this hotel + detected language pair.
   // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!language || step !== 'language') return
+    if (step !== 'form') return
     const storageKey = `chat_session_${hotelId}_${language}`
     const token = localStorage.getItem(storageKey)
     if (!token) return
@@ -195,17 +198,8 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   // -----------------------------------------------------------------------
   // Step transitions
   // -----------------------------------------------------------------------
-  const handleLanguageContinue = () => {
-    if (!language) return
-    if (session) {
-      setStep('chat')
-    } else {
-      setStep('form')
-    }
-  }
-
   const handleSubmitForm = async (formValue: BookingFormValue) => {
-    if (!language) return
+    void ensureGuestNotificationPermission()
     setCreating(true)
     setCreateError(null)
     try {
@@ -214,7 +208,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
         customer_language: language,
         ...formValue,
       })
-      localStorage.setItem(`chat_session_${hotelId}_${language}`, newSession.customer_token)
+      rememberGuestSession(hotelId, language, newSession.customer_token)
       setSession(newSession)
       setLoadingMessages(true)
       const msgs = await getChatMessages(newSession.id)
@@ -229,35 +223,12 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
     }
   }
 
-  const handleSkipForm = async () => {
-    if (!language) return
-    setCreating(true)
-    setCreateError(null)
-    try {
-      const newSession = await createChatSession({
-        hotel_id: hotelId,
-        customer_language: language,
-      })
-      localStorage.setItem(`chat_session_${hotelId}_${language}`, newSession.customer_token)
-      setSession(newSession)
-      setLoadingMessages(true)
-      const msgs = await getChatMessages(newSession.id)
-      setMessages(msgs)
-      setLoadingMessages(false)
-      setStep('chat')
-    } catch (err) {
-      setCreateError((err as Error).message ?? 'Could not start the chat. Please try again.')
-    } finally {
-      setCreating(false)
-    }
-  }
-
   // -----------------------------------------------------------------------
   // Sending
   // -----------------------------------------------------------------------
   const performSend = useCallback(
     (text: string, opts?: { messageType?: 'TEXT' | 'IMAGE'; imageUrl?: string }) => {
-      if (!session || !language) return
+      if (!session) return
       const trimmed = text.trim()
       if (!trimmed && !opts?.imageUrl) return
 
@@ -369,7 +340,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
-  const headerLang = language ? getLanguage(language) : null
+  const headerLang = getLanguage(language)
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-end sm:justify-end">
@@ -392,7 +363,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-[15px] leading-tight truncate">
-                {step === 'language' ? t('en', 'chat.title') : t(lang, 'chat.title')}
+                {t(lang, 'chat.title')}
               </p>
               <p className="text-[11.5px] text-white/80 mt-0.5 truncate flex items-center gap-1.5">
                 {step === 'chat' ? (
@@ -440,29 +411,20 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
         ) : null}
 
         {/* Body */}
-        {step === 'language' ? (
+        {step === 'form' ? (
           <>
-            <LanguagePicker
-              selected={language}
-              onSelect={setLanguage}
-              onContinue={handleLanguageContinue}
+            <BookingForm
               hotelName={hotelName}
+              language={lang}
+              loading={creating}
+              onSubmit={handleSubmitForm}
+              onSkip={handleClose}
             />
             {loading ? (
               <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center">
                 <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : null}
-          </>
-        ) : step === 'form' ? (
-          <>
-            <BookingForm
-              language={lang}
-              loading={creating}
-              onSubmit={handleSubmitForm}
-              onSkip={handleSkipForm}
-              onBack={() => setStep('language')}
-            />
             {createError ? (
               <div className="px-5 pb-3 -mt-2">
                 <div className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">

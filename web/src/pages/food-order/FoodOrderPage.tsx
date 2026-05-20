@@ -10,6 +10,10 @@ import {
 } from '../../api'
 import { TopHeader } from '../../components/TopHeader'
 import { formatVnd } from '../../lib/currency'
+import {
+  ensureGuestNotificationPermission,
+  rememberGuestOrder,
+} from '../../hooks/useGuestFaviconNotifications'
 
 type CartLine = { item: MenuItem; quantity: number }
 
@@ -100,6 +104,7 @@ export function FoodOrderPage() {
       window.alert(lang === 'VN' ? 'Vui lòng nhập số phòng' : 'Please enter your room number')
       return
     }
+    void ensureGuestNotificationPermission()
     setSubmitting(true)
     try {
       const order = await createFoodOrder({
@@ -111,6 +116,7 @@ export function FoodOrderPage() {
         note: note.trim() || undefined,
         items: cart.map((l) => ({ menu_item_id: l.item.id, quantity: l.quantity })),
       })
+      rememberGuestOrder(order.id)
       setOrderSuccess(order.id)
       setCart([])
       setCartOpen(false)

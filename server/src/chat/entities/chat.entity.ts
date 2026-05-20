@@ -70,6 +70,12 @@ export class CustomerSession {
   @Column({ type: 'varchar', length: 100, nullable: true })
   customer_name: string;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  customer_first_name: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  customer_last_name: string;
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   customer_phone: string;
 
@@ -96,6 +102,12 @@ export class CustomerSession {
 
   @Column({ type: 'text', nullable: true })
   initial_request: string;
+
+  @Column({ type: 'boolean', default: false })
+  privacy_consent: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  analytics_consent: boolean;
 
   @Column({
     type: 'enum',

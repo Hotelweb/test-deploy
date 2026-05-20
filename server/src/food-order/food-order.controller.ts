@@ -30,6 +30,7 @@ import { CreateFoodOrderDto } from './dto/create-food-order.dto.js';
 import { UpdateFoodOrderStatusDto } from './dto/update-food-order-status.dto.js';
 import type { FoodOrderStatus } from './entities/food-order.entity.js';
 import { PaginationQueryDto } from '../common/pagination/pagination.dto.js';
+import { ChatGateway } from '../chat/chat.gateway.js';
 
 function assertHotelAccess(user: TokenPayload, hotelId: number) {
   if (user.scope === 'system') return;
@@ -43,7 +44,10 @@ function assertHotelAccess(user: TokenPayload, hotelId: number) {
 @ApiTags('food-order')
 @Controller('food-order')
 export class FoodOrderController {
-  constructor(private readonly foodOrderService: FoodOrderService) {}
+  constructor(
+    private readonly foodOrderService: FoodOrderService,
+    private readonly chatGateway: ChatGateway,
+  ) {}
 
   // -------------------------------------------------------------------------
   // Public — guest menu & ordering
@@ -150,7 +154,9 @@ export class FoodOrderController {
   ) {
     const order = await this.foodOrderService.getOrder(id);
     assertHotelAccess(user, order.hotel_id);
-    return this.foodOrderService.updateOrderStatus(id, dto);
+    const updated = await this.foodOrderService.updateOrderStatus(id, dto);
+    this.chatGateway.emitOrderStatusChanged(updated);
+    return updated;
   }
 
   @Get('admin/stats/hotel/:hotelId')

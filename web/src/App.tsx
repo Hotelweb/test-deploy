@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation, useParams } from 'react-router-dom'
 import { GuestRouteGuard, RootRedirect } from './components/GuestRouteGuard'
 import { RequireAuth } from './components/RequireAuth'
+import { useGuestFaviconNotifications } from './hooks/useGuestFaviconNotifications'
 
 const HotelDetailPage = lazy(() =>
   import('./pages/HotelDetailPage').then(({ HotelDetailPage }) => ({ default: HotelDetailPage })),
@@ -39,6 +40,7 @@ const FoodOrderAdminPage = lazy(() =>
 function App() {
   return (
     <BrowserRouter>
+      <GuestFaviconNotifications />
       <GuestRouteGuard>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -63,6 +65,12 @@ function App() {
       </GuestRouteGuard>
     </BrowserRouter>
   )
+}
+
+function GuestFaviconNotifications() {
+  const location = useLocation()
+  useGuestFaviconNotifications(!location.pathname.startsWith('/admin'))
+  return null
 }
 
 function RouteFallback() {

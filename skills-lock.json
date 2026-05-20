@@ -13,6 +13,12 @@
       "skillPath": "skills/react-vite-best-practices/SKILL.md",
       "computedHash": "82994934665a490b227fabdfec3d148b1fa291d77d82ccf978e761b9e1ff6e4c"
     },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "292c93e5a86e2429204bc37abe26b3c9023c4760eb02418462887f2082f118ce"
+    },
     "tailwind-best-practices": {
       "source": "AsyrafHussin/agent-skills",
       "sourceType": "github",

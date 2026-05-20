@@ -13,6 +13,7 @@ import { ChatService } from './chat.service.js';
 import { ChatSessionStatus } from './entities/chat.entity.js';
 import { TokenService, type TokenPayload } from '../auth/token.service.js';
 import { assertHotelAccess } from '../auth/hotel-access.js';
+import type { FoodOrderView } from '../food-order/food-order.service.js';
 
 interface SocketData {
   role?: 'customer' | 'staff';
@@ -101,6 +102,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const room = `hotel_${data.hotelId}`;
     void client.join(room);
     return { event: 'joinedHotel', data: { hotelId: data.hotelId } };
+  }
+
+  @SubscribeMessage('joinOrder')
+  handleJoinOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId: number },
+  ) {
+    const room = `order_${data.orderId}`;
+    void client.join(room);
+    return { event: 'joinedOrder', data: { orderId: data.orderId } };
   }
 
   // ---------------------------------------------------------------------------
@@ -250,5 +261,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(`session_${data.sessionId}`)
       .emit('sessionStatusChanged', { sessionId: data.sessionId, session });
+  }
+
+  emitOrderStatusChanged(order: FoodOrderView) {
+    this.server.to(`order_${order.id}`).emit('orderStatusChanged', {
+      orderId: order.id,
+      order,
+    });
+    this.server.to(`hotel_${order.hotel_id}`).emit('orderStatusChanged', {
+      orderId: order.id,
+      order,
+    });
   }
 }
