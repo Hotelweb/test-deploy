@@ -91,7 +91,7 @@ export function FoodOrderAdminPage() {
       ])
       setHotel(h)
       setStats(s)
-      setOrders(o)
+      setOrders(o.data)
       setMenu(m)
       setPendingCount(p)
     } catch (err) {
@@ -118,7 +118,7 @@ export function FoodOrderAdminPage() {
             if (p > prev && prev > 0) playNotificationSound()
             return p
           })
-          setOrders(o)
+          setOrders(o.data)
           setStats(s)
         } catch {
           // ignore poll errors

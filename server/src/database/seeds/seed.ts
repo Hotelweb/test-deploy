@@ -86,7 +86,9 @@ async function seed() {
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);
-    await queryRunner.query(`ALTER TYPE language_code ADD VALUE IF NOT EXISTS 'th';`);
+    await queryRunner.query(
+      `ALTER TYPE language_code ADD VALUE IF NOT EXISTS 'th';`,
+    );
     await queryRunner.query(
       `ALTER TYPE chat_session_status ADD VALUE IF NOT EXISTS 'BOOKED';`,
     );

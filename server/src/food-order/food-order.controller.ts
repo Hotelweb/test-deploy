@@ -29,6 +29,7 @@ import { UpdateMenuItemDto } from './dto/update-menu-item.dto.js';
 import { CreateFoodOrderDto } from './dto/create-food-order.dto.js';
 import { UpdateFoodOrderStatusDto } from './dto/update-food-order-status.dto.js';
 import type { FoodOrderStatus } from './entities/food-order.entity.js';
+import { PaginationQueryDto } from '../common/pagination/pagination.dto.js';
 
 function assertHotelAccess(user: TokenPayload, hotelId: number) {
   if (user.scope === 'system') return;
@@ -127,13 +128,16 @@ export class FoodOrderController {
   @Get('admin/orders/hotel/:hotelId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'per_page', required: false, type: Number, example: 20 })
   getOrdersAdmin(
     @Param('hotelId', ParseIntPipe) hotelId: number,
+    @Query() pagination: PaginationQueryDto,
     @Query('status') status?: FoodOrderStatus,
     @CurrentUser() user?: TokenPayload,
   ) {
     assertHotelAccess(user!, hotelId);
-    return this.foodOrderService.getOrdersForAdmin(hotelId, status);
+    return this.foodOrderService.getOrdersForAdmin(hotelId, pagination, status);
   }
 
   @Patch('admin/orders/:id/status')

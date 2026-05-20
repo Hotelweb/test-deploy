@@ -14,8 +14,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
         const databaseUrl = configService.get<string>('DATABASE_URL');
         const ssl =
-          configService.get<string>('DB_SSL', 'false').toLowerCase() ===
-          'true';
+          configService.get<string>('DB_SSL', 'false').toLowerCase() === 'true';
 
         // If DATABASE_URL is provided (e.g. on Vercel with Render Postgres),
         // use it directly. Otherwise fall back to individual DB_* vars.

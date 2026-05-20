@@ -15,6 +15,11 @@ import { CreateMenuItemDto } from './dto/create-menu-item.dto.js';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto.js';
 import { CreateFoodOrderDto } from './dto/create-food-order.dto.js';
 import { UpdateFoodOrderStatusDto } from './dto/update-food-order-status.dto.js';
+import {
+  buildPaginatedResponse,
+  PaginationQueryDto,
+  type PaginatedResponse,
+} from '../common/pagination/pagination.dto.js';
 
 export interface MenuItemView {
   id: number;
@@ -224,17 +229,27 @@ export class FoodOrderService {
 
   async getOrdersForAdmin(
     hotelId: number,
+    pagination: PaginationQueryDto,
     status?: FoodOrderStatus,
-  ): Promise<FoodOrderView[]> {
+  ): Promise<PaginatedResponse<FoodOrderView>> {
     const where: Record<string, unknown> = { hotel_id: hotelId };
     if (status) where.status = status;
 
-    const orders = await this.orderRepo.find({
+    const [orders, totalCount] = await this.orderRepo.findAndCount({
       where,
       order: { created_at: 'DESC' },
       relations: ['items'],
+      skip: (pagination.page - 1) * pagination.per_page,
+      take: pagination.per_page,
     });
-    return orders.map((o) => this.toOrderView(o));
+
+    return buildPaginatedResponse(
+      orders.map((o) => this.toOrderView(o)),
+      totalCount,
+      pagination,
+      `/food-order/admin/orders/hotel/${hotelId}`,
+      { status },
+    );
   }
 
   async getOrder(id: number): Promise<FoodOrderView> {

@@ -42,7 +42,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   handleConnection(client: TypedSocket) {
-    const raw = client.handshake.auth?.token;
+    const auth = client.handshake.auth as { token?: unknown } | undefined;
+    const raw = auth?.token;
     if (typeof raw === 'string' && raw.length > 0) {
       try {
         client.data.user = this.tokenService.verify(raw);

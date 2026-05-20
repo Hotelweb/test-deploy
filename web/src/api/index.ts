@@ -25,7 +25,9 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     let detail = ''
     try {
       const body = await res.json()
-      const msg = (body as { message?: string | string[] })?.message
+      const msg =
+        (body as { error?: { message?: string }; message?: string | string[] })?.error?.message ??
+        (body as { message?: string | string[] })?.message
       detail = Array.isArray(msg) ? msg.join('; ') : (msg ?? '')
     } catch {
       // ignore JSON parse errors
@@ -281,10 +283,12 @@ export const uploadImage = async (
   if (!res.ok) {
     let detail = ''
     try {
-      const payload = (await res.json()) as { message?: string | string[] }
-      detail = Array.isArray(payload?.message)
-        ? payload.message.join('; ')
-        : (payload?.message ?? '')
+      const payload = (await res.json()) as {
+        error?: { message?: string }
+        message?: string | string[]
+      }
+      const msg = payload.error?.message ?? payload.message
+      detail = Array.isArray(msg) ? msg.join('; ') : (msg ?? '')
     } catch {
       // ignore parse errors
     }
@@ -393,6 +397,22 @@ export interface FoodOrderStats {
   orders_today: number
 }
 
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: {
+    current_page: number
+    per_page: number
+    total_pages: number
+    total_count: number
+  }
+  links: {
+    first: string | null
+    prev: string | null
+    next: string | null
+    last: string | null
+  }
+}
+
 export interface CreateMenuItemInput {
   hotel_id: number
   category?: MenuCategory
@@ -457,10 +477,21 @@ export const updateMenuItem = (id: number, data: UpdateMenuItemInput) =>
 export const deleteMenuItem = (id: number) =>
   fetchApi<void>(`/food-order/admin/menu/${id}`, { method: 'DELETE' })
 
-export const getAdminFoodOrders = (hotelId: number, status?: FoodOrderStatus) =>
-  fetchApi<FoodOrder[]>(
-    `/food-order/admin/orders/hotel/${hotelId}${status ? `?status=${status}` : ''}`,
+export const getAdminFoodOrders = (
+  hotelId: number,
+  status?: FoodOrderStatus,
+  page = 1,
+  perPage = 20,
+) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: String(perPage),
+  })
+  if (status) params.set('status', status)
+  return fetchApi<PaginatedResponse<FoodOrder>>(
+    `/food-order/admin/orders/hotel/${hotelId}?${params.toString()}`,
   )
+}
 
 export const updateFoodOrderStatus = (
   id: number,
