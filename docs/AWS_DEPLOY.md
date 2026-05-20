@@ -145,7 +145,6 @@ cd /opt/a25/server
 sudo systemctl stop a25-server
 DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/reset-db.js
 DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/seeds/seed.js
-DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js
 sudo systemctl start a25-server
 ```
 

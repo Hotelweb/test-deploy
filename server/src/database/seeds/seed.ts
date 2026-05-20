@@ -86,6 +86,10 @@ async function seed() {
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);
+    await queryRunner.query(`ALTER TYPE language_code ADD VALUE IF NOT EXISTS 'th';`);
+    await queryRunner.query(
+      `ALTER TYPE chat_session_status ADD VALUE IF NOT EXISTS 'BOOKED';`,
+    );
 
     // Translation pipeline + message delivery state. Originally introduced
     // as `001_chat_translation.sql` migration; folded into the seed so a
@@ -100,6 +104,27 @@ async function seed() {
     await queryRunner.query(`
       DO $$ BEGIN
         CREATE TYPE message_status AS ENUM ('SENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+
+    await queryRunner.query(`
+      DO $$ BEGIN
+        CREATE TYPE service_type AS ENUM ('content', 'food_order');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+
+    await queryRunner.query(`
+      DO $$ BEGIN
+        CREATE TYPE menu_category AS ENUM ('food', 'drink');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+
+    await queryRunner.query(`
+      DO $$ BEGIN
+        CREATE TYPE food_order_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'CANCELLED');
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);
@@ -135,6 +160,11 @@ async function seed() {
     await queryRunner.query(`
       ALTER TABLE hotels
         ADD COLUMN IF NOT EXISTS gallery TEXT[] NOT NULL DEFAULT '{}';
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE hotels
+        ALTER COLUMN qr_token SET DEFAULT gen_random_uuid();
     `);
 
     // System Admins
@@ -190,10 +220,16 @@ async function seed() {
         image_url TEXT,
         sort_order INT NOT NULL DEFAULT 0,
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        service_type service_type NOT NULL DEFAULT 'content',
         deleted_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE services
+        ADD COLUMN IF NOT EXISTS service_type service_type NOT NULL DEFAULT 'content';
     `);
 
     // Service Translations
@@ -290,14 +326,35 @@ async function seed() {
       CREATE TABLE IF NOT EXISTS menu_items (
         id BIGSERIAL PRIMARY KEY,
         hotel_id BIGINT NOT NULL,
-        category_id BIGINT NOT NULL,
+        category_id BIGINT,
+        category menu_category NOT NULL DEFAULT 'food',
+        name VARCHAR(200) NOT NULL DEFAULT '',
+        name_en VARCHAR(200),
+        description TEXT,
+        description_en TEXT,
         image_url TEXT,
         price DECIMAL(12,2) NOT NULL CHECK (price >= 0),
+        sort_order INT NOT NULL DEFAULT 0,
         is_available BOOLEAN NOT NULL DEFAULT TRUE,
         deleted_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE menu_items
+        ADD COLUMN IF NOT EXISTS category_id BIGINT,
+        ADD COLUMN IF NOT EXISTS category menu_category,
+        ADD COLUMN IF NOT EXISTS name VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS name_en VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS description TEXT,
+        ADD COLUMN IF NOT EXISTS description_en TEXT,
+        ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 0;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE menu_items ALTER COLUMN category_id DROP NOT NULL;
     `);
 
     // Menu Item Translations
@@ -367,6 +424,37 @@ async function seed() {
       );
     `);
 
+    // Food order module tables. These replace the old generic orders/order_items
+    // migration path for the local app.
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS food_orders (
+        id BIGSERIAL PRIMARY KEY,
+        hotel_id BIGINT NOT NULL,
+        service_id BIGINT,
+        room_number VARCHAR(50),
+        customer_name VARCHAR(120),
+        customer_phone VARCHAR(50),
+        note TEXT,
+        status food_order_status NOT NULL DEFAULT 'PENDING',
+        total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        rejected_reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS food_order_items (
+        id BIGSERIAL PRIMARY KEY,
+        order_id BIGINT NOT NULL,
+        menu_item_id BIGINT,
+        item_name VARCHAR(200) NOT NULL,
+        category menu_category NOT NULL DEFAULT 'food',
+        unit_price DECIMAL(12,2) NOT NULL,
+        quantity INT NOT NULL DEFAULT 1
+      );
+    `);
+
     // Media Files
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS media_files (
@@ -401,6 +489,8 @@ async function seed() {
       CREATE INDEX IF NOT EXISTS idx_menu_categories_hotel_active_sort ON menu_categories (hotel_id, is_active, sort_order);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_category_translations_cat_lang ON menu_category_translations (category_id, language);
       CREATE INDEX IF NOT EXISTS idx_menu_items_hotel_cat_avail ON menu_items (hotel_id, category_id, is_available);
+      CREATE INDEX IF NOT EXISTS idx_menu_items_hotel ON menu_items(hotel_id);
+      CREATE INDEX IF NOT EXISTS idx_menu_items_hotel_available ON menu_items(hotel_id, is_available) WHERE deleted_at IS NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_item_translations_item_lang ON menu_item_translations (menu_item_id, language);
       CREATE INDEX IF NOT EXISTS idx_orders_hotel_status_created ON orders (hotel_id, status, created_at);
       CREATE INDEX IF NOT EXISTS idx_orders_session ON orders (session_id);
@@ -408,6 +498,9 @@ async function seed() {
       CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items (order_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_hotel_user_read ON notifications (hotel_id, recipient_user_id, is_read);
       CREATE INDEX IF NOT EXISTS idx_media_files_hotel_created ON media_files (hotel_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_food_orders_hotel_status ON food_orders(hotel_id, status);
+      CREATE INDEX IF NOT EXISTS idx_food_orders_created ON food_orders(hotel_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_food_order_items_order ON food_order_items(order_id);
     `);
 
     // ============================================================
@@ -617,6 +710,38 @@ async function seed() {
       'id',
       'SET NULL',
     );
+    await addFK(
+      'fk_food_orders_hotel',
+      'food_orders',
+      'hotel_id',
+      'hotels',
+      'id',
+      'CASCADE',
+    );
+    await addFK(
+      'fk_food_orders_service',
+      'food_orders',
+      'service_id',
+      'services',
+      'id',
+      'SET NULL',
+    );
+    await addFK(
+      'fk_food_order_items_order',
+      'food_order_items',
+      'order_id',
+      'food_orders',
+      'id',
+      'CASCADE',
+    );
+    await addFK(
+      'fk_food_order_items_menu_item',
+      'food_order_items',
+      'menu_item_id',
+      'menu_items',
+      'id',
+      'SET NULL',
+    );
 
     // ============================================================
     // SEED DATA
@@ -625,10 +750,10 @@ async function seed() {
 
     // Hotels
     await queryRunner.query(`
-      INSERT INTO hotels (name, slug, phone, email, address, description)
+      INSERT INTO hotels (name, slug, phone, email, address, description, qr_token)
       VALUES
-        ('Grand Palace Hotel', 'grand-palace-hotel', '+84-28-1234-5678', 'info@grandpalace.vn', '123 Nguyen Hue, District 1, HCMC', 'Luxury 5-star hotel in the heart of Ho Chi Minh City'),
-        ('Seaside Resort Da Nang', 'seaside-resort-danang', '+84-236-9876-543', 'hello@seasidedanang.vn', '456 Vo Nguyen Giap, Son Tra, Da Nang', 'Beautiful beachfront resort with ocean views')
+        ('Grand Palace Hotel', 'grand-palace-hotel', '+84-28-1234-5678', 'info@grandpalace.vn', '123 Nguyen Hue, District 1, HCMC', 'Luxury 5-star hotel in the heart of Ho Chi Minh City', gen_random_uuid()),
+        ('Seaside Resort Da Nang', 'seaside-resort-danang', '+84-236-9876-543', 'hello@seasidedanang.vn', '456 Vo Nguyen Giap, Son Tra, Da Nang', 'Beautiful beachfront resort with ocean views', gen_random_uuid())
       ON CONFLICT (slug) DO NOTHING;
     `);
 
@@ -712,19 +837,37 @@ async function seed() {
 
     // Menu Items
     await queryRunner.query(`
-      INSERT INTO menu_items (hotel_id, category_id, price)
+      INSERT INTO menu_items (
+        id,
+        hotel_id,
+        category_id,
+        category,
+        name,
+        name_en,
+        description,
+        description_en,
+        price,
+        sort_order
+      )
       VALUES
-        (1, 1, 85000),
-        (1, 1, 120000),
-        (1, 2, 250000),
-        (1, 2, 320000),
-        (1, 3, 45000),
-        (1, 3, 65000),
-        (2, 4, 450000),
-        (2, 4, 380000),
-        (2, 5, 95000),
-        (2, 5, 110000)
-      ON CONFLICT DO NOTHING;
+        (1, 1, 1, 'food',  'Gỏi cuốn tôm',       'Fresh Spring Rolls', 'Gỏi cuốn tươi với tôm và rau sống',       'Fresh rolls with shrimp and vegetables',       85000,  1),
+        (2, 1, 1, 'food',  'Súp bí đỏ',           'Pumpkin Soup',       'Súp bí đỏ kem tươi',                      'Creamy pumpkin soup',                          120000, 2),
+        (3, 1, 2, 'food',  'Bò lúc lắc',          'Shaking Beef',       'Bò Úc xào với rau củ',                    'Australian beef stir-fried with vegetables',   250000, 3),
+        (4, 1, 2, 'food',  'Cơm chiên hải sản',   'Seafood Fried Rice', 'Cơm chiên với tôm, mực, nghêu',           'Fried rice with shrimp, squid, and clams',     320000, 4),
+        (5, 1, 3, 'drink', 'Trà sen',             'Lotus Tea',          'Trà sen Tây Hồ',                          'West Lake lotus tea',                          45000,  5),
+        (6, 1, 3, 'drink', 'Sinh tố bơ',          'Avocado Smoothie',   'Sinh tố bơ tươi',                         'Fresh avocado smoothie',                       65000,  6),
+        (7, 2, 4, 'food',  'Tôm hùm nướng',       'Grilled Lobster',    'Tôm hùm nướng bơ tỏi',                    'Garlic butter grilled lobster',                450000, 1),
+        (8, 2, 4, 'food',  'Cua rang me',         'Tamarind Crab',      'Cua biển rang me chua ngọt',              'Sweet and sour tamarind crab',                 380000, 2),
+        (9, 2, 5, 'food',  'Chè bưởi',            'Pomelo Dessert',     'Chè bưởi truyền thống',                   'Traditional pomelo sweet soup',                95000,  3),
+        (10, 2, 5, 'food', 'Kem dừa',             'Coconut Ice Cream',  'Kem dừa tươi Bến Tre',                    'Fresh Ben Tre coconut ice cream',              110000, 4)
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    await queryRunner.query(`
+      SELECT setval(
+        pg_get_serial_sequence('menu_items', 'id'),
+        GREATEST((SELECT COALESCE(MAX(id), 1) FROM menu_items), 1)
+      );
     `);
 
     // Menu Item Translations
@@ -752,6 +895,61 @@ async function seed() {
         (10, 'vi', 'Kem dừa', 'Kem dừa tươi Bến Tre'),
         (10, 'en', 'Coconut Ice Cream', 'Fresh Ben Tre coconut ice cream')
       ON CONFLICT DO NOTHING;
+    `);
+
+    await queryRunner.query(`
+      UPDATE menu_items mi
+      SET
+        name = COALESCE(
+          NULLIF(mi.name, ''),
+          (SELECT t.name FROM menu_item_translations t WHERE t.menu_item_id = mi.id AND t.language = 'vi' LIMIT 1),
+          'Món #' || mi.id::text
+        ),
+        name_en = COALESCE(
+          mi.name_en,
+          (SELECT t.name FROM menu_item_translations t WHERE t.menu_item_id = mi.id AND t.language = 'en' LIMIT 1)
+        ),
+        description = COALESCE(
+          mi.description,
+          (SELECT t.description FROM menu_item_translations t WHERE t.menu_item_id = mi.id AND t.language = 'vi' LIMIT 1)
+        ),
+        description_en = COALESCE(
+          mi.description_en,
+          (SELECT t.description FROM menu_item_translations t WHERE t.menu_item_id = mi.id AND t.language = 'en' LIMIT 1)
+        ),
+        category = COALESCE(
+          mi.category,
+          CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM menu_category_translations mct
+              WHERE mct.category_id = mi.category_id
+                AND (
+                  lower(mct.name) LIKE '%uống%'
+                  OR lower(mct.name) LIKE '%drink%'
+                  OR lower(mct.name) LIKE '%beverage%'
+                  OR lower(mct.name) LIKE '%coffee%'
+                  OR lower(mct.name) LIKE '%tea%'
+                )
+            )
+            THEN 'drink'::menu_category
+            ELSE 'food'::menu_category
+          END
+        );
+    `);
+
+    await queryRunner.query(`
+      UPDATE menu_items
+      SET
+        category = COALESCE(category, 'food'::menu_category),
+        name = COALESCE(NULLIF(name, ''), 'Món #' || id::text);
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE menu_items ALTER COLUMN category SET DEFAULT 'food';
+      ALTER TABLE menu_items ALTER COLUMN category SET NOT NULL;
+      ALTER TABLE menu_items ALTER COLUMN name SET NOT NULL;
+      ALTER TABLE menu_items ALTER COLUMN name DROP DEFAULT;
     `);
 
     await queryRunner.commitTransaction();

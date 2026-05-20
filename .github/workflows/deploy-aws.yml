@@ -1,229 +1,229 @@
-name: Deploy to AWS test
+# name: Deploy to AWS test
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+# on:
+#   push:
+#     branches: [main]
+#   workflow_dispatch:
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22.13.1"
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: "22.13.1"
 
-      - name: Install pnpm
-        run: npm install -g pnpm@11.1.3
+#       - name: Install pnpm
+#         run: npm install -g pnpm@11.1.3
 
-      - name: Build server artifact
-        working-directory: server
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm run build
-          pnpm prune --prod
-          tar -czf /tmp/a25-server.tgz package.json pnpm-lock.yaml dist node_modules
+#       - name: Build server artifact
+#         working-directory: server
+#         run: |
+#           pnpm install --frozen-lockfile
+#           pnpm run build
+#           pnpm prune --prod
+#           tar -czf /tmp/a25-server.tgz package.json pnpm-lock.yaml dist node_modules
 
-      - name: Build web artifact
-        working-directory: web
-        env:
-          VITE_SERVER_URL: http://${{ secrets.SERVER_HOST }}
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm run build
-          tar -czf /tmp/a25-web.tgz dist
+#       - name: Build web artifact
+#         working-directory: web
+#         env:
+#           VITE_SERVER_URL: http://${{ secrets.SERVER_HOST }}
+#         run: |
+#           pnpm install --frozen-lockfile
+#           pnpm run build
+#           tar -czf /tmp/a25-web.tgz dist
 
-      - name: Upload artifacts to EC2
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-        run: |
-          test -n "$SERVER_HOST" || (echo "SERVER_HOST secret is empty" && exit 1)
-          test -n "$SERVER_USER" || (echo "SERVER_USER secret is empty" && exit 1)
-          test -n "$SERVER_SSH_KEY" || (echo "SERVER_SSH_KEY secret is empty" && exit 1)
+#       - name: Upload artifacts to EC2
+#         env:
+#           SERVER_HOST: ${{ secrets.SERVER_HOST }}
+#           SERVER_USER: ${{ secrets.SERVER_USER }}
+#           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+#         run: |
+#           test -n "$SERVER_HOST" || (echo "SERVER_HOST secret is empty" && exit 1)
+#           test -n "$SERVER_USER" || (echo "SERVER_USER secret is empty" && exit 1)
+#           test -n "$SERVER_SSH_KEY" || (echo "SERVER_SSH_KEY secret is empty" && exit 1)
 
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$SERVER_SSH_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > ~/.ssh/a25_aws
-          chmod 600 ~/.ssh/a25_aws
+#           install -m 700 -d ~/.ssh
+#           printf '%s\n' "$SERVER_SSH_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > ~/.ssh/a25_aws
+#           chmod 600 ~/.ssh/a25_aws
 
-          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ConnectionAttempts=3 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+#           SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ConnectionAttempts=3 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
-          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-            if ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "echo ssh-ready"; then
-              break
-            fi
-            if [ "$attempt" = "15" ]; then
-              echo "Unable to connect to EC2 over SSH after 15 attempts."
-              echo "Check SERVER_HOST, SERVER_USER, SERVER_SSH_KEY, EC2 state, and security group port 22."
-              exit 1
-            fi
-            echo "SSH is not ready yet, retrying in 20 seconds..."
-            sleep 20
-          done
+#           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+#             if ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "echo ssh-ready"; then
+#               break
+#             fi
+#             if [ "$attempt" = "15" ]; then
+#               echo "Unable to connect to EC2 over SSH after 15 attempts."
+#               echo "Check SERVER_HOST, SERVER_USER, SERVER_SSH_KEY, EC2 state, and security group port 22."
+#               exit 1
+#             fi
+#             echo "SSH is not ready yet, retrying in 20 seconds..."
+#             sleep 20
+#           done
 
-          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "sudo mkdir -p /opt/a25 /opt/a25/server /var/www/a25 && sudo chown -R $SERVER_USER:$SERVER_USER /opt/a25 /var/www/a25"
-          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-server.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-server.tgz"
-          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-web.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-web.tgz"
+#           ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "sudo mkdir -p /opt/a25 /opt/a25/server /var/www/a25 && sudo chown -R $SERVER_USER:$SERVER_USER /opt/a25 /var/www/a25"
+#           scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-server.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-server.tgz"
+#           scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25-web.tgz "$SERVER_USER@$SERVER_HOST:/opt/a25/a25-web.tgz"
 
-      - name: Deploy with systemd and nginx
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-          CLOUDINARY_FOLDER: ${{ secrets.CLOUDINARY_FOLDER }}
-          GOOGLE_TRANSLATE_API_KEY: ${{ secrets.GOOGLE_TRANSLATE_API_KEY }}
-          SYSTEM_ADMIN_EMAIL: ${{ secrets.SYSTEM_ADMIN_EMAIL }}
-          SYSTEM_ADMIN_PASSWORD: ${{ secrets.SYSTEM_ADMIN_PASSWORD }}
-          SYSTEM_ADMIN_NAME: ${{ secrets.SYSTEM_ADMIN_NAME }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
-        run: |
-          SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ConnectionAttempts=3 -o ServerAliveInterval=30 -o ServerAliveCountMax=20"
+#       - name: Deploy with systemd and nginx
+#         env:
+#           SERVER_HOST: ${{ secrets.SERVER_HOST }}
+#           SERVER_USER: ${{ secrets.SERVER_USER }}
+#           DB_HOST: ${{ secrets.DB_HOST }}
+#           DB_PORT: ${{ secrets.DB_PORT }}
+#           DB_USERNAME: ${{ secrets.DB_USERNAME }}
+#           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+#           DB_NAME: ${{ secrets.DB_NAME }}
+#           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+#           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+#           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+#           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+#           CLOUDINARY_FOLDER: ${{ secrets.CLOUDINARY_FOLDER }}
+#           GOOGLE_TRANSLATE_API_KEY: ${{ secrets.GOOGLE_TRANSLATE_API_KEY }}
+#           SYSTEM_ADMIN_EMAIL: ${{ secrets.SYSTEM_ADMIN_EMAIL }}
+#           SYSTEM_ADMIN_PASSWORD: ${{ secrets.SYSTEM_ADMIN_PASSWORD }}
+#           SYSTEM_ADMIN_NAME: ${{ secrets.SYSTEM_ADMIN_NAME }}
+#           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+#           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+#         run: |
+#           SSH_OPTS="-i $HOME/.ssh/a25_aws -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ConnectionAttempts=3 -o ServerAliveInterval=30 -o ServerAliveCountMax=20"
 
-          write_env() {
-            local key="$1"
-            local value="${2:-}"
-            value="${value//\'/\'\\\'\'}"
-            printf "%s='%s'\n" "$key" "$value" >> /tmp/a25.env.production
-          }
+#           write_env() {
+#             local key="$1"
+#             local value="${2:-}"
+#             value="${value//\'/\'\\\'\'}"
+#             printf "%s='%s'\n" "$key" "$value" >> /tmp/a25.env.production
+#           }
 
-          : > /tmp/a25.env.production
-          write_env NODE_ENV production
-          write_env PORT 3000
-          write_env DB_SYNCHRONIZE false
-          write_env PUBLIC_API_URL "http://${SERVER_HOST}"
-          write_env FRONTEND_URL "http://${SERVER_HOST}"
-          write_env DB_HOST "$DB_HOST"
-          write_env DB_PORT "$DB_PORT"
-          write_env DB_SSL true
-          write_env DB_USERNAME "$DB_USERNAME"
-          write_env DB_PASSWORD "$DB_PASSWORD"
-          write_env DB_NAME "$DB_NAME"
-          write_env JWT_SECRET "$JWT_SECRET"
-          write_env CLOUDINARY_CLOUD_NAME "$CLOUDINARY_CLOUD_NAME"
-          write_env CLOUDINARY_API_KEY "$CLOUDINARY_API_KEY"
-          write_env CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET"
-          write_env CLOUDINARY_FOLDER "${CLOUDINARY_FOLDER:-a25}"
-          write_env GOOGLE_TRANSLATE_API_KEY "$GOOGLE_TRANSLATE_API_KEY"
-          write_env OPENAI_API_KEY "$OPENAI_API_KEY"
-          write_env DEEPL_API_KEY "$DEEPL_API_KEY"
-          write_env SYSTEM_ADMIN_EMAIL "$SYSTEM_ADMIN_EMAIL"
-          write_env SYSTEM_ADMIN_PASSWORD "$SYSTEM_ADMIN_PASSWORD"
-          write_env SYSTEM_ADMIN_NAME "$SYSTEM_ADMIN_NAME"
+#           : > /tmp/a25.env.production
+#           write_env NODE_ENV production
+#           write_env PORT 3000
+#           write_env DB_SYNCHRONIZE false
+#           write_env PUBLIC_API_URL "http://${SERVER_HOST}"
+#           write_env FRONTEND_URL "http://${SERVER_HOST}"
+#           write_env DB_HOST "$DB_HOST"
+#           write_env DB_PORT "$DB_PORT"
+#           write_env DB_SSL true
+#           write_env DB_USERNAME "$DB_USERNAME"
+#           write_env DB_PASSWORD "$DB_PASSWORD"
+#           write_env DB_NAME "$DB_NAME"
+#           write_env JWT_SECRET "$JWT_SECRET"
+#           write_env CLOUDINARY_CLOUD_NAME "$CLOUDINARY_CLOUD_NAME"
+#           write_env CLOUDINARY_API_KEY "$CLOUDINARY_API_KEY"
+#           write_env CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET"
+#           write_env CLOUDINARY_FOLDER "${CLOUDINARY_FOLDER:-a25}"
+#           write_env GOOGLE_TRANSLATE_API_KEY "$GOOGLE_TRANSLATE_API_KEY"
+#           write_env OPENAI_API_KEY "$OPENAI_API_KEY"
+#           write_env DEEPL_API_KEY "$DEEPL_API_KEY"
+#           write_env SYSTEM_ADMIN_EMAIL "$SYSTEM_ADMIN_EMAIL"
+#           write_env SYSTEM_ADMIN_PASSWORD "$SYSTEM_ADMIN_PASSWORD"
+#           write_env SYSTEM_ADMIN_NAME "$SYSTEM_ADMIN_NAME"
 
-          scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25.env.production "$SERVER_USER@$SERVER_HOST:/opt/a25/.env.production"
+#           scp -i "$HOME/.ssh/a25_aws" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=45 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 /tmp/a25.env.production "$SERVER_USER@$SERVER_HOST:/opt/a25/.env.production"
 
-          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
-          set -euo pipefail
+#           ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+#           set -euo pipefail
 
-          if ! command -v node >/dev/null 2>&1 || ! node -v | grep -q '^v22\.'; then
-            curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-          fi
+#           if ! command -v node >/dev/null 2>&1 || ! node -v | grep -q '^v22\.'; then
+#             curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+#             sudo apt-get install -y nodejs
+#           fi
 
-          if ! command -v nginx >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y nginx
-          fi
+#           if ! command -v nginx >/dev/null 2>&1; then
+#             sudo apt-get update
+#             sudo apt-get install -y nginx
+#           fi
 
-          if command -v docker >/dev/null 2>&1; then
-            sudo docker ps -q --filter publish=80 | xargs -r sudo docker stop
-            sudo docker ps -q --filter publish=3000 | xargs -r sudo docker stop
-          fi
+#           if command -v docker >/dev/null 2>&1; then
+#             sudo docker ps -q --filter publish=80 | xargs -r sudo docker stop
+#             sudo docker ps -q --filter publish=3000 | xargs -r sudo docker stop
+#           fi
 
-          sudo mkdir -p /opt/a25/server /var/www/a25
-          sudo chown -R ubuntu:ubuntu /opt/a25 /var/www/a25
+#           sudo mkdir -p /opt/a25/server /var/www/a25
+#           sudo chown -R ubuntu:ubuntu /opt/a25 /var/www/a25
 
-          rm -rf /opt/a25/server/*
-          tar -xzf /opt/a25/a25-server.tgz -C /opt/a25/server
+#           rm -rf /opt/a25/server/*
+#           tar -xzf /opt/a25/a25-server.tgz -C /opt/a25/server
 
-          rm -rf /var/www/a25/*
-          tar -xzf /opt/a25/a25-web.tgz -C /var/www/a25
-          mv /var/www/a25/dist/* /var/www/a25/
-          rmdir /var/www/a25/dist
+#           rm -rf /var/www/a25/*
+#           tar -xzf /opt/a25/a25-web.tgz -C /var/www/a25
+#           mv /var/www/a25/dist/* /var/www/a25/
+#           rmdir /var/www/a25/dist
 
-          cp /opt/a25/.env.production /opt/a25/server/.env.production
-          cd /opt/a25/server
-          DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js
+#           cp /opt/a25/.env.production /opt/a25/server/.env.production
+#           cd /opt/a25/server
+#           DOTENV_CONFIG_PATH=.env.production node -r dotenv/config dist/database/migrations/run-migration.js
 
-          sudo tee /etc/systemd/system/a25-server.service >/dev/null <<'SERVICE'
-          [Unit]
-          Description=A25 NestJS server
-          After=network-online.target
-          Wants=network-online.target
+#           sudo tee /etc/systemd/system/a25-server.service >/dev/null <<'SERVICE'
+#           [Unit]
+#           Description=A25 NestJS server
+#           After=network-online.target
+#           Wants=network-online.target
 
-          [Service]
-          Type=simple
-          User=ubuntu
-          WorkingDirectory=/opt/a25/server
-          EnvironmentFile=/opt/a25/server/.env.production
-          ExecStart=/usr/bin/node /opt/a25/server/dist/main.js
-          Restart=always
-          RestartSec=5
+#           [Service]
+#           Type=simple
+#           User=ubuntu
+#           WorkingDirectory=/opt/a25/server
+#           EnvironmentFile=/opt/a25/server/.env.production
+#           ExecStart=/usr/bin/node /opt/a25/server/dist/main.js
+#           Restart=always
+#           RestartSec=5
 
-          [Install]
-          WantedBy=multi-user.target
-          SERVICE
+#           [Install]
+#           WantedBy=multi-user.target
+#           SERVICE
 
-          sudo tee /etc/nginx/sites-available/a25 >/dev/null <<'NGINX'
-          server {
-            listen 80 default_server;
-            listen [::]:80 default_server;
-            server_name _;
+#           sudo tee /etc/nginx/sites-available/a25 >/dev/null <<'NGINX'
+#           server {
+#             listen 80 default_server;
+#             listen [::]:80 default_server;
+#             server_name _;
 
-            root /var/www/a25;
-            index index.html;
-            client_max_body_size 20m;
+#             root /var/www/a25;
+#             index index.html;
+#             client_max_body_size 20m;
 
-            location /socket.io/ {
-              proxy_pass http://127.0.0.1:3000/socket.io/;
-              proxy_http_version 1.1;
-              proxy_set_header Upgrade $http_upgrade;
-              proxy_set_header Connection "upgrade";
-              proxy_set_header Host $host;
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $scheme;
-            }
+#             location /socket.io/ {
+#               proxy_pass http://127.0.0.1:3000/socket.io/;
+#               proxy_http_version 1.1;
+#               proxy_set_header Upgrade $http_upgrade;
+#               proxy_set_header Connection "upgrade";
+#               proxy_set_header Host $host;
+#               proxy_set_header X-Real-IP $remote_addr;
+#               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#               proxy_set_header X-Forwarded-Proto $scheme;
+#             }
 
-            location ~ ^/(auth|hotels|hotel-users|services|chat|food-order|uploads|api/docs)(/|$) {
-              proxy_pass http://127.0.0.1:3000;
-              proxy_http_version 1.1;
-              proxy_set_header Host $host;
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $scheme;
-            }
+#             location ~ ^/(auth|hotels|hotel-users|services|chat|food-order|uploads|api/docs)(/|$) {
+#               proxy_pass http://127.0.0.1:3000;
+#               proxy_http_version 1.1;
+#               proxy_set_header Host $host;
+#               proxy_set_header X-Real-IP $remote_addr;
+#               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#               proxy_set_header X-Forwarded-Proto $scheme;
+#             }
 
-            location / {
-              try_files $uri $uri/ /index.html;
-            }
-          }
-          NGINX
+#             location / {
+#               try_files $uri $uri/ /index.html;
+#             }
+#           }
+#           NGINX
 
-          sudo rm -f /etc/nginx/sites-enabled/default
-          sudo ln -sfn /etc/nginx/sites-available/a25 /etc/nginx/sites-enabled/a25
-          sudo nginx -t
+#           sudo rm -f /etc/nginx/sites-enabled/default
+#           sudo ln -sfn /etc/nginx/sites-available/a25 /etc/nginx/sites-enabled/a25
+#           sudo nginx -t
 
-          sudo systemctl daemon-reload
-          sudo systemctl enable a25-server
-          sudo systemctl restart a25-server
-          sudo systemctl enable nginx
-          sudo systemctl restart nginx
+#           sudo systemctl daemon-reload
+#           sudo systemctl enable a25-server
+#           sudo systemctl restart a25-server
+#           sudo systemctl enable nginx
+#           sudo systemctl restart nginx
 
-          sudo systemctl --no-pager --full status a25-server
-          REMOTE
+#           sudo systemctl --no-pager --full status a25-server
+#           REMOTE
