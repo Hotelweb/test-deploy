@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:analyze": "tsc -b && vite build --mode analyze",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
@@ -14,6 +15,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "clsx": "^2.1.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -21,6 +23,7 @@
     "react-router-dom": "^7.15.1",
     "remark-gfm": "^4.0.1",
     "socket.io-client": "^4.8.3",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
@@ -36,6 +39,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "prettier": "^3.8.3",
+    "rollup-plugin-visualizer": "^7.0.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"

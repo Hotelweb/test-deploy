@@ -9,3 +9,4 @@ dist/
 tfplan
 *.log
 .DS_Store
+.agents/

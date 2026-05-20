@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { cn } from '../lib/cn'
 import { MarkdownContent } from './MarkdownContent'
 
 interface MarkdownEditorProps {
@@ -178,9 +179,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors cursor-pointer ${
-        active ? 'bg-white text-text shadow-soft' : 'text-text-light hover:text-text'
-      }`}
+      className={cn(
+        'px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors cursor-pointer',
+        active ? 'bg-white text-text shadow-soft' : 'text-text-light hover:text-text',
+      )}
     >
       {label}
     </button>

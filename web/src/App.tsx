@@ -1,39 +1,73 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { GuestRouteGuard, RootRedirect } from './components/GuestRouteGuard'
-import { HotelDetailPage } from './pages/HotelDetailPage'
-import { AdminChatPage } from './pages/AdminChatPage'
-import { RootAdminPage } from './pages/RootAdminPage'
-import { LoginPage } from './pages/LoginPage'
-import { HotelServicesAdminPage } from './pages/HotelServicesAdminPage'
-import { FoodOrderPage } from './pages/FoodOrderPage'
-import { FoodOrderAdminPage } from './pages/FoodOrderAdminPage'
-import { HotelAdminHomePage } from './pages/HotelAdminHomePage'
 import { RequireAuth } from './components/RequireAuth'
+
+const HotelDetailPage = lazy(() =>
+  import('./pages/HotelDetailPage').then(({ HotelDetailPage }) => ({ default: HotelDetailPage })),
+)
+const FoodOrderPage = lazy(() =>
+  import('./pages/FoodOrderPage').then(({ FoodOrderPage }) => ({ default: FoodOrderPage })),
+)
+const LoginPage = lazy(() =>
+  import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })),
+)
+const RootAdminPage = lazy(() =>
+  import('./pages/RootAdminPage').then(({ RootAdminPage }) => ({ default: RootAdminPage })),
+)
+const HotelAdminHomePage = lazy(() =>
+  import('./pages/HotelAdminHomePage').then(({ HotelAdminHomePage }) => ({
+    default: HotelAdminHomePage,
+  })),
+)
+const AdminChatPage = lazy(() =>
+  import('./pages/AdminChatPage').then(({ AdminChatPage }) => ({ default: AdminChatPage })),
+)
+const HotelServicesAdminPage = lazy(() =>
+  import('./pages/HotelServicesAdminPage').then(({ HotelServicesAdminPage }) => ({
+    default: HotelServicesAdminPage,
+  })),
+)
+const FoodOrderAdminPage = lazy(() =>
+  import('./pages/FoodOrderAdminPage').then(({ FoodOrderAdminPage }) => ({
+    default: FoodOrderAdminPage,
+  })),
+)
 
 function App() {
   return (
     <BrowserRouter>
       <GuestRouteGuard>
-        <Routes>
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="/hotel/:slug" element={<HotelDetailPage />} />
-          <Route path="/hotel/:slug/order/:serviceId" element={<FoodOrderPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/admin"
-            element={
-              <RequireAuth scopes={['system']}>
-                <RootAdminPage />
-              </RequireAuth>
-            }
-          />
-          <Route path="/admin/:hotelId" element={<HotelAdminHomeRoute />} />
-          <Route path="/admin/:hotelId/chat" element={<AdminChatRoute />} />
-          <Route path="/admin/:hotelId/services" element={<HotelServicesAdminRoute />} />
-          <Route path="/admin/:hotelId/food-order" element={<FoodOrderAdminRoute />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="/hotel/:slug" element={<HotelDetailPage />} />
+            <Route path="/hotel/:slug/order/:serviceId" element={<FoodOrderPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/admin"
+              element={
+                <RequireAuth scopes={['system']}>
+                  <RootAdminPage />
+                </RequireAuth>
+              }
+            />
+            <Route path="/admin/:hotelId" element={<HotelAdminHomeRoute />} />
+            <Route path="/admin/:hotelId/chat" element={<AdminChatRoute />} />
+            <Route path="/admin/:hotelId/services" element={<HotelServicesAdminRoute />} />
+            <Route path="/admin/:hotelId/food-order" element={<FoodOrderAdminRoute />} />
+          </Routes>
+        </Suspense>
       </GuestRouteGuard>
     </BrowserRouter>
+  )
+}
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background-warm">
+      <div className="h-10 w-10 rounded-full border-3 border-primary border-t-transparent animate-spin" />
+    </div>
   )
 }
 

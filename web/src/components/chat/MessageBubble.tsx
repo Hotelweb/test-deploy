@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ChatMessage } from '../../api'
+import { cn } from '../../lib/cn'
 import {
   AlertIcon,
   CheckDoubleIcon,
@@ -78,23 +79,33 @@ export function MessageBubble({
   const showSecondary = Boolean(secondaryText && primaryText !== secondaryText)
   const isTranslating = message.translation_status === 'PENDING' && !message._optimistic
   const isTranslationFailed = message.translation_status === 'FAILED'
+  const subtleTextClass = isMine ? 'text-white/75' : 'text-text-light'
+  const dotClass = cn(
+    'w-1 h-1 rounded-full animate-bounce',
+    isMine ? 'bg-white/60' : 'bg-text-light',
+  )
 
   return (
     <div
-      className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`}
+      className={cn('flex animate-fade-in', isMine ? 'justify-end' : 'justify-start')}
       data-testid="message-bubble"
     >
       <div
-        className={`flex flex-col max-w-[82%] sm:max-w-[78%] ${isMine ? 'items-end' : 'items-start'}`}
+        className={cn(
+          'flex flex-col max-w-[82%] sm:max-w-[78%]',
+          isMine ? 'items-end' : 'items-start',
+        )}
       >
         <div
-          className={`relative rounded-2xl px-3.5 py-2.5 shadow-soft ${
+          className={cn(
+            'relative rounded-2xl px-3.5 py-2.5 shadow-soft',
             isMine
               ? viewer === 'customer'
                 ? 'gradient-primary text-white rounded-br-md'
                 : 'bg-indigo-600 text-white rounded-br-md'
-              : 'bg-white border border-border-light text-text rounded-bl-md'
-          } ${message._failed ? 'ring-1 ring-red-300' : ''}`}
+              : 'bg-white border border-border-light text-text rounded-bl-md',
+            message._failed && 'ring-1 ring-red-300',
+          )}
         >
           {/* Image attachment */}
           {isImage && message.image_url ? (
@@ -123,37 +134,26 @@ export function MessageBubble({
           {/* Translation status + secondary line */}
           {!isImage && (isTranslating || isTranslationFailed || showSecondary) ? (
             <div
-              className={`mt-1.5 pt-1.5 border-t ${
-                isMine ? 'border-white/20' : 'border-border-light'
-              }`}
+              className={cn(
+                'mt-1.5 pt-1.5 border-t',
+                isMine ? 'border-white/20' : 'border-border-light',
+              )}
             >
               {isTranslating ? (
-                <div
-                  className={`flex items-center gap-1.5 text-[11px] ${
-                    isMine ? 'text-white/75' : 'text-text-light'
-                  }`}
-                >
+                <div className={cn('flex items-center gap-1.5 text-[11px]', subtleTextClass)}>
                   <span className="flex gap-0.5" aria-hidden>
-                    <span
-                      className={`w-1 h-1 rounded-full ${isMine ? 'bg-white/60' : 'bg-text-light'} animate-bounce`}
-                      style={{ animationDelay: '0ms' }}
-                    />
-                    <span
-                      className={`w-1 h-1 rounded-full ${isMine ? 'bg-white/60' : 'bg-text-light'} animate-bounce`}
-                      style={{ animationDelay: '120ms' }}
-                    />
-                    <span
-                      className={`w-1 h-1 rounded-full ${isMine ? 'bg-white/60' : 'bg-text-light'} animate-bounce`}
-                      style={{ animationDelay: '240ms' }}
-                    />
+                    <span className={dotClass} style={{ animationDelay: '0ms' }} />
+                    <span className={dotClass} style={{ animationDelay: '120ms' }} />
+                    <span className={dotClass} style={{ animationDelay: '240ms' }} />
                   </span>
                   <span>{labels.translating}</span>
                 </div>
               ) : isTranslationFailed ? (
                 <div
-                  className={`flex items-center gap-1.5 text-[11px] ${
-                    isMine ? 'text-white/85' : 'text-amber-600'
-                  }`}
+                  className={cn(
+                    'flex items-center gap-1.5 text-[11px]',
+                    isMine ? 'text-white/85' : 'text-amber-600',
+                  )}
                 >
                   <AlertIcon className="w-3 h-3" />
                   <span>{labels.translationFailed}</span>
@@ -162,11 +162,12 @@ export function MessageBubble({
                 <button
                   type="button"
                   onClick={() => setExpanded((v) => !v)}
-                  className={`flex items-center gap-1.5 text-[11px] cursor-pointer transition-colors duration-200 ${
+                  className={cn(
+                    'flex items-center gap-1.5 text-[11px] cursor-pointer transition-colors duration-200',
                     isMine
                       ? 'text-white/70 hover:text-white/90'
-                      : 'text-text-light hover:text-text-muted'
-                  }`}
+                      : 'text-text-light hover:text-text-muted',
+                  )}
                 >
                   <TranslateBubbleIcon className="w-3 h-3" />
                   <span>{expanded ? labels.hideOriginal : labels.showOriginal}</span>
@@ -176,9 +177,10 @@ export function MessageBubble({
               {/* Expanded secondary text */}
               {expanded && showSecondary && !isTranslating ? (
                 <p
-                  className={`mt-1 text-[12.5px] leading-relaxed whitespace-pre-wrap italic ${
-                    isMine ? 'text-white/85' : 'text-text-muted'
-                  }`}
+                  className={cn(
+                    'mt-1 text-[12.5px] leading-relaxed whitespace-pre-wrap italic',
+                    isMine ? 'text-white/85' : 'text-text-muted',
+                  )}
                 >
                   {secondaryText}
                 </p>
@@ -189,9 +191,10 @@ export function MessageBubble({
 
         {/* Meta row: time + status (mine only) + translated badge */}
         <div
-          className={`flex items-center gap-2 mt-1 px-1 ${
-            isMine ? 'flex-row-reverse' : 'flex-row'
-          }`}
+          className={cn(
+            'flex items-center gap-2 mt-1 px-1',
+            isMine ? 'flex-row-reverse' : 'flex-row',
+          )}
         >
           <span className="text-[10.5px] text-text-lighter">{formatTime(message.created_at)}</span>
 

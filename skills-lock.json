@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "api-design-patterns": {
+      "source": "AsyrafHussin/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-design-patterns/SKILL.md",
+      "computedHash": "3f15c74774287c26486439158e2f7454907b6751fbd2e7842f034555e47df796"
+    },
+    "react-vite-best-practices": {
+      "source": "AsyrafHussin/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-vite-best-practices/SKILL.md",
+      "computedHash": "82994934665a490b227fabdfec3d148b1fa291d77d82ccf978e761b9e1ff6e4c"
+    },
+    "tailwind-best-practices": {
+      "source": "AsyrafHussin/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tailwind-best-practices/SKILL.md",
+      "computedHash": "39145b4b9d12b154d9ff9261805d225557a1dcb5c881b1da8dcc027004aefd44"
+    }
+  }
+}

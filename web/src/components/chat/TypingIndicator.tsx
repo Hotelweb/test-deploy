@@ -1,3 +1,5 @@
+import { cn } from '../../lib/cn'
+
 interface TypingIndicatorProps {
   /** Optional label shown next to the dots, e.g. "Hotel team is typing" */
   label?: string
@@ -6,21 +8,21 @@ interface TypingIndicatorProps {
 }
 
 export function TypingIndicator({ label, variant = 'guest' }: TypingIndicatorProps) {
-  const dotColor = variant === 'guest' ? 'bg-emerald-500' : 'bg-indigo-500'
+  const dotClass = cn(
+    'w-1.5 h-1.5 rounded-full animate-bounce',
+    variant === 'guest' ? 'bg-emerald-500' : 'bg-indigo-500',
+  )
 
   return (
     <div className="flex items-end gap-2 animate-fade-in" aria-live="polite">
       <div className="flex items-center gap-1 bg-white border border-border-light rounded-2xl rounded-bl-sm px-3 py-2.5 shadow-soft">
+        <span className={dotClass} style={{ animationDelay: '0ms', animationDuration: '900ms' }} />
         <span
-          className={`w-1.5 h-1.5 rounded-full ${dotColor} animate-bounce`}
-          style={{ animationDelay: '0ms', animationDuration: '900ms' }}
-        />
-        <span
-          className={`w-1.5 h-1.5 rounded-full ${dotColor} animate-bounce`}
+          className={dotClass}
           style={{ animationDelay: '150ms', animationDuration: '900ms' }}
         />
         <span
-          className={`w-1.5 h-1.5 rounded-full ${dotColor} animate-bounce`}
+          className={dotClass}
           style={{ animationDelay: '300ms', animationDuration: '900ms' }}
         />
       </div>
