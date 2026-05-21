@@ -22,25 +22,25 @@ export type FoodOrderStatus =
 @Entity('food_orders')
 export class FoodOrder {
   @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  id!: number;
 
   @Column({ type: 'bigint' })
-  hotel_id: number;
+  hotel_id!: number;
 
   @Column({ type: 'bigint', nullable: true })
-  service_id: number | null;
+  service_id!: number | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  room_number: string | null;
+  room_number!: string | null;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
-  customer_name: string | null;
+  customer_name!: string | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  customer_phone: string | null;
+  customer_phone!: string | null;
 
   @Column({ type: 'text', nullable: true })
-  note: string | null;
+  note!: string | null;
 
   @Column({
     type: 'enum',
@@ -48,45 +48,45 @@ export class FoodOrder {
     enumName: 'food_order_status',
     default: 'PENDING',
   })
-  status: FoodOrderStatus;
+  status!: FoodOrderStatus;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
-  total_amount: string;
+  total_amount!: string;
 
   @Column({ type: 'text', nullable: true })
-  rejected_reason: string | null;
+  rejected_reason!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
-  created_at: Date;
+  created_at!: Date;
 
   @UpdateDateColumn({ type: 'timestamptz' })
-  updated_at: Date;
+  updated_at!: Date;
 
   @ManyToOne(() => Hotel)
   @JoinColumn({ name: 'hotel_id' })
-  hotel: Hotel;
+  hotel!: Hotel;
 
   @ManyToOne(() => Service, { nullable: true })
   @JoinColumn({ name: 'service_id' })
-  service: Service | null;
+  service!: Service | null;
 
   @OneToMany(() => FoodOrderItem, (item) => item.order, { eager: true })
-  items: FoodOrderItem[];
+  items!: FoodOrderItem[];
 }
 
 @Entity('food_order_items')
 export class FoodOrderItem {
   @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  id!: number;
 
   @Column({ type: 'bigint' })
-  order_id: number;
+  order_id!: number;
 
   @Column({ type: 'bigint', nullable: true })
-  menu_item_id: number | null;
+  menu_item_id!: number | null;
 
   @Column({ type: 'varchar', length: 200 })
-  item_name: string;
+  item_name!: string;
 
   @Column({
     type: 'enum',
@@ -94,15 +94,15 @@ export class FoodOrderItem {
     enumName: 'menu_category',
     default: 'food',
   })
-  category: MenuCategory;
+  category!: MenuCategory;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
-  unit_price: string;
+  unit_price!: string;
 
   @Column({ type: 'int', default: 1 })
-  quantity: number;
+  quantity!: number;
 
   @ManyToOne(() => FoodOrder, (order) => order.items)
   @JoinColumn({ name: 'order_id' })
-  order: FoodOrder;
+  order!: FoodOrder;
 }

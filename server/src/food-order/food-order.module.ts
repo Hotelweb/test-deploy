@@ -6,6 +6,9 @@ import { FoodOrderService } from './food-order.service.js';
 import { FoodOrderController } from './food-order.controller.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { ChatModule } from '../chat/chat.module.js';
+import { FoodOrderStatsService } from './services/food-order-stats.service.js';
+import { MenuManagementService } from './services/menu-management.service.js';
+import { OrderManagementService } from './services/order-management.service.js';
 
 @Module({
   imports: [
@@ -14,7 +17,12 @@ import { ChatModule } from '../chat/chat.module.js';
     ChatModule,
   ],
   controllers: [FoodOrderController],
-  providers: [FoodOrderService],
+  providers: [
+    FoodOrderService,
+    MenuManagementService,
+    OrderManagementService,
+    FoodOrderStatsService,
+  ],
   exports: [FoodOrderService],
 })
 export class FoodOrderModule {}

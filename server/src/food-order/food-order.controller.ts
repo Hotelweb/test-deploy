@@ -170,6 +170,22 @@ export class FoodOrderController {
     return this.foodOrderService.getStats(hotelId);
   }
 
+  @Get('admin/analytics/hotel/:hotelId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Food order analytics for admin dashboards',
+    description:
+      'Aggregated order trends for charts: best-selling items, top revenue items, peak ordering hours, status and category breakdowns.',
+  })
+  getAnalytics(
+    @Param('hotelId', ParseIntPipe) hotelId: number,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    assertHotelAccess(user, hotelId);
+    return this.foodOrderService.getAnalytics(hotelId);
+  }
+
   @Get('admin/pending-count/hotel/:hotelId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

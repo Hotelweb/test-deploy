@@ -400,9 +400,45 @@ export interface FoodOrderStats {
   accepted_orders: number
   rejected_orders: number
   completed_orders: number
+  cancelled_orders: number
   total_revenue: number
   revenue_today: number
   orders_today: number
+}
+
+export interface FoodOrderAnalyticsItem {
+  item_name: string
+  category: MenuCategory
+  quantity: number
+  order_count: number
+  total_revenue: number
+}
+
+export interface FoodOrderAnalyticsHour {
+  hour: number
+  order_count: number
+  total_revenue: number
+}
+
+export interface FoodOrderAnalyticsStatus {
+  status: FoodOrderStatus
+  order_count: number
+  total_revenue: number
+}
+
+export interface FoodOrderAnalyticsCategory {
+  category: MenuCategory
+  quantity: number
+  total_revenue: number
+}
+
+export interface FoodOrderAnalytics {
+  top_items_by_quantity: FoodOrderAnalyticsItem[]
+  top_items_by_revenue: FoodOrderAnalyticsItem[]
+  orders_by_hour: FoodOrderAnalyticsHour[]
+  status_breakdown: FoodOrderAnalyticsStatus[]
+  category_breakdown: FoodOrderAnalyticsCategory[]
+  peak_hour: FoodOrderAnalyticsHour | null
 }
 
 export interface PaginatedResponse<T> {
@@ -512,6 +548,9 @@ export const updateFoodOrderStatus = (
 
 export const getFoodOrderStats = (hotelId: number) =>
   fetchApi<FoodOrderStats>(`/food-order/admin/stats/hotel/${hotelId}`)
+
+export const getFoodOrderAnalytics = (hotelId: number) =>
+  fetchApi<FoodOrderAnalytics>(`/food-order/admin/analytics/hotel/${hotelId}`)
 
 export const getPendingOrderCount = (hotelId: number) =>
   fetchApi<number>(`/food-order/admin/pending-count/hotel/${hotelId}`)

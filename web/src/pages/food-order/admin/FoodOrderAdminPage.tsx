@@ -35,6 +35,7 @@ export function FoodOrderAdminPage() {
         {admin.tab === 'stats' && admin.stats ? (
           <StatsPanel
             stats={admin.stats}
+            analytics={admin.analytics}
             onOpenOrders={(filter) => {
               admin.setOrderFilter(filter)
               admin.setTab('orders')
@@ -44,10 +45,14 @@ export function FoodOrderAdminPage() {
 
         {admin.tab === 'orders' ? (
           <OrdersPanel
-            orders={admin.filteredOrders}
+            orders={admin.orders}
             filter={admin.orderFilter}
             counts={admin.orderCounts}
+            meta={admin.ordersMeta}
+            page={admin.orderPage}
+            loading={admin.loadingOrders}
             onFilterChange={admin.setOrderFilter}
+            onPageChange={admin.setOrderPage}
             onAction={admin.handleOrderAction}
           />
         ) : null}
