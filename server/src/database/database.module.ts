@@ -8,9 +8,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
+        const isProduction =
+          configService.get<string>('NODE_ENV', 'development') === 'production';
         const synchronize =
-          configService.get<string>('DB_SYNCHRONIZE', 'true').toLowerCase() !==
-          'false';
+          configService
+            .get<string>('DB_SYNCHRONIZE', isProduction ? 'false' : 'true')
+            .toLowerCase() !== 'false';
 
         const databaseUrl = configService.get<string>('DATABASE_URL');
         const ssl =

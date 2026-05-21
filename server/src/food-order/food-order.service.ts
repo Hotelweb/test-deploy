@@ -286,46 +286,46 @@ export class FoodOrderService {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [counts, revenue, today] = await Promise.all([
-      this.orderRepo
-        .createQueryBuilder('o')
-        .select('o.status', 'status')
-        .addSelect('COUNT(*)', 'count')
-        .where('o.hotel_id = :hotelId', { hotelId })
-        .groupBy('o.status')
-        .getRawMany<{ status: FoodOrderStatus; count: string }>(),
-      this.orderRepo
-        .createQueryBuilder('o')
-        .select(
-          `COALESCE(SUM(CASE WHEN o.status IN ('ACCEPTED', 'COMPLETED') THEN o.total_amount ELSE 0 END), 0)`,
-          'total',
-        )
-        .where('o.hotel_id = :hotelId', { hotelId })
-        .getRawOne<{ total: string }>(),
-      this.orderRepo
-        .createQueryBuilder('o')
-        .select('COUNT(*)', 'orders')
-        .addSelect(
-          `COALESCE(SUM(CASE WHEN o.status IN ('ACCEPTED', 'COMPLETED') THEN o.total_amount ELSE 0 END), 0)`,
-          'revenue',
-        )
-        .where('o.hotel_id = :hotelId', { hotelId })
-        .andWhere('o.created_at >= :todayStart', { todayStart })
-        .getRawOne<{ orders: string; revenue: string }>(),
-    ]);
-
-    const byStatus = new Map(counts.map((c) => [c.status, Number(c.count)]));
-    const totalOrders = counts.reduce((sum, c) => sum + Number(c.count), 0);
+    const stats = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('COUNT(*)', 'total_orders')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'PENDING')`, 'pending')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'ACCEPTED')`, 'accepted')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'REJECTED')`, 'rejected')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'COMPLETED')`, 'completed')
+      .addSelect(
+        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('ACCEPTED', 'COMPLETED')), 0)`,
+        'total_revenue',
+      )
+      .addSelect(
+        `COUNT(*) FILTER (WHERE o.created_at >= :todayStart)`,
+        'orders_today',
+      )
+      .addSelect(
+        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('ACCEPTED', 'COMPLETED') AND o.created_at >= :todayStart), 0)`,
+        'revenue_today',
+      )
+      .where('o.hotel_id = :hotelId', { hotelId, todayStart })
+      .getRawOne<{
+        total_orders: string;
+        pending: string;
+        accepted: string;
+        rejected: string;
+        completed: string;
+        total_revenue: string;
+        orders_today: string;
+        revenue_today: string;
+      }>();
 
     return {
-      total_orders: totalOrders,
-      pending_orders: byStatus.get('PENDING') ?? 0,
-      accepted_orders: byStatus.get('ACCEPTED') ?? 0,
-      rejected_orders: byStatus.get('REJECTED') ?? 0,
-      completed_orders: byStatus.get('COMPLETED') ?? 0,
-      total_revenue: Number(revenue?.total ?? 0),
-      revenue_today: Number(today?.revenue ?? 0),
-      orders_today: Number(today?.orders ?? 0),
+      total_orders: Number(stats?.total_orders ?? 0),
+      pending_orders: Number(stats?.pending ?? 0),
+      accepted_orders: Number(stats?.accepted ?? 0),
+      rejected_orders: Number(stats?.rejected ?? 0),
+      completed_orders: Number(stats?.completed ?? 0),
+      total_revenue: Number(stats?.total_revenue ?? 0),
+      revenue_today: Number(stats?.revenue_today ?? 0),
+      orders_today: Number(stats?.orders_today ?? 0),
     };
   }
 

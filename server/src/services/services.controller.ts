@@ -86,33 +86,7 @@ export class ServicesController {
     @Param('id', ParseIntPipe) id: number,
     @Query('lang') lang?: string,
   ) {
-    const service = await this.servicesService.findOne(id);
-    // Reuse the same view shape so the customer detail modal can fall back
-    // to a different language without a second request.
-    const list = await this.servicesService.findByHotel(
-      Number(service.hotel_id),
-      lang,
-    );
-    const found = list.find((s) => s.id === Number(service.id));
-    return (
-      found ?? {
-        // Service is inactive / hidden — still return raw payload for admins
-        // hitting the endpoint while testing.
-        id: Number(service.id),
-        hotel_id: Number(service.hotel_id),
-        icon_url: service.icon_url ?? null,
-        image_url: service.image_url ?? null,
-        sort_order: service.sort_order,
-        is_active: service.is_active,
-        service_type: service.service_type ?? 'content',
-        translations: service.translations,
-        title: service.translations?.[0]?.title ?? '',
-        description: service.translations?.[0]?.description ?? '',
-        language: service.translations?.[0]?.language ?? '',
-        created_at: service.created_at,
-        updated_at: service.updated_at,
-      }
-    );
+    return this.servicesService.findOneView(id, lang);
   }
 
   // ----------------------------------------------------------------------

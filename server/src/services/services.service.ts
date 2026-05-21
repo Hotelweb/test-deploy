@@ -83,6 +83,11 @@ export class ServicesService {
     return service;
   }
 
+  async findOneView(id: number, language?: string): Promise<ServiceView> {
+    const service = await this.findOne(id);
+    return this.toView(service, language);
+  }
+
   /**
    * Create a service together with its translations in a single transaction.
    * Translations are unique per `(service_id, language)`; we de-duplicate the

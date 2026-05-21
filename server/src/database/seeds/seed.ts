@@ -264,17 +264,21 @@ async function seed() {
         room_type VARCHAR(80),
         check_in_date DATE,
         check_out_date DATE,
-        guest_count INT,
+        guest_count INT CONSTRAINT ck_customer_sessions_guest_count_positive
+          CHECK (guest_count IS NULL OR guest_count > 0),
         initial_request TEXT,
         privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
         analytics_consent BOOLEAN NOT NULL DEFAULT FALSE,
         customer_language language_code NOT NULL,
         status chat_session_status NOT NULL DEFAULT 'OPEN',
-        unread_count INT NOT NULL DEFAULT 0,
+        unread_count INT NOT NULL DEFAULT 0
+          CONSTRAINT ck_customer_sessions_unread_count_nonnegative CHECK (unread_count >= 0),
         last_message_at TIMESTAMPTZ,
         closed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT ck_customer_sessions_date_range
+          CHECK (check_in_date IS NULL OR check_out_date IS NULL OR check_out_date >= check_in_date)
       );
     `);
 
@@ -450,7 +454,8 @@ async function seed() {
         customer_phone VARCHAR(50),
         note TEXT,
         status food_order_status NOT NULL DEFAULT 'PENDING',
-        total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        total_amount DECIMAL(12,2) NOT NULL DEFAULT 0
+          CONSTRAINT ck_food_orders_total_amount_nonnegative CHECK (total_amount >= 0),
         rejected_reason TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -464,8 +469,10 @@ async function seed() {
         menu_item_id BIGINT,
         item_name VARCHAR(200) NOT NULL,
         category menu_category NOT NULL DEFAULT 'food',
-        unit_price DECIMAL(12,2) NOT NULL,
+        unit_price DECIMAL(12,2) NOT NULL
+          CONSTRAINT ck_food_order_items_unit_price_nonnegative CHECK (unit_price >= 0),
         quantity INT NOT NULL DEFAULT 1
+          CONSTRAINT ck_food_order_items_quantity_positive CHECK (quantity > 0)
       );
     `);
 
@@ -492,19 +499,24 @@ async function seed() {
     console.log('Creating indexes...');
 
     await queryRunner.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_hotel_users_hotel_email ON hotel_users (hotel_id, email);
+      DROP INDEX IF EXISTS idx_hotel_users_hotel_email;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_users_hotel_email_active ON hotel_users (hotel_id, email) WHERE deleted_at IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_hotel_users_active_email ON hotel_users (email) WHERE deleted_at IS NULL AND is_active = TRUE;
       CREATE INDEX IF NOT EXISTS idx_services_hotel_active_sort ON services (hotel_id, is_active, sort_order);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_service_translations_service_lang ON service_translations (service_id, language);
       CREATE INDEX IF NOT EXISTS idx_customer_sessions_hotel_status_msg ON customer_sessions (hotel_id, status, last_message_at);
+      CREATE INDEX IF NOT EXISTS idx_customer_sessions_hotel_activity ON customer_sessions (hotel_id, (COALESCE(last_message_at, created_at)) DESC);
       CREATE INDEX IF NOT EXISTS idx_customer_sessions_hotel_phone ON customer_sessions (hotel_id, customer_phone);
       CREATE INDEX IF NOT EXISTS idx_customer_sessions_hotel_token ON customer_sessions (hotel_id, customer_token);
       CREATE INDEX IF NOT EXISTS idx_chat_messages_hotel_session_created ON chat_messages (hotel_id, session_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_chat_messages_session_read ON chat_messages (session_id, is_read);
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_session_sender_unread ON chat_messages (session_id, sender_type) WHERE is_read = FALSE;
       CREATE INDEX IF NOT EXISTS idx_menu_categories_hotel_active_sort ON menu_categories (hotel_id, is_active, sort_order);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_category_translations_cat_lang ON menu_category_translations (category_id, language);
       CREATE INDEX IF NOT EXISTS idx_menu_items_hotel_cat_avail ON menu_items (hotel_id, category_id, is_available);
       CREATE INDEX IF NOT EXISTS idx_menu_items_hotel ON menu_items(hotel_id);
       CREATE INDEX IF NOT EXISTS idx_menu_items_hotel_available ON menu_items(hotel_id, is_available) WHERE deleted_at IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_menu_items_public_sort ON menu_items(hotel_id, is_available, sort_order, id) WHERE deleted_at IS NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_item_translations_item_lang ON menu_item_translations (menu_item_id, language);
       CREATE INDEX IF NOT EXISTS idx_orders_hotel_status_created ON orders (hotel_id, status, created_at);
       CREATE INDEX IF NOT EXISTS idx_orders_session ON orders (session_id);
@@ -513,6 +525,7 @@ async function seed() {
       CREATE INDEX IF NOT EXISTS idx_notifications_hotel_user_read ON notifications (hotel_id, recipient_user_id, is_read);
       CREATE INDEX IF NOT EXISTS idx_media_files_hotel_created ON media_files (hotel_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_food_orders_hotel_status ON food_orders(hotel_id, status);
+      CREATE INDEX IF NOT EXISTS idx_food_orders_hotel_status_created ON food_orders(hotel_id, status, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_food_orders_created ON food_orders(hotel_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_food_order_items_order ON food_order_items(order_id);
     `);
@@ -535,6 +548,20 @@ async function seed() {
         DO $$ BEGIN
           ALTER TABLE ${table} ADD CONSTRAINT ${name}
             FOREIGN KEY (${column}) REFERENCES ${refTable}(${refColumn}) ON DELETE ${onDelete};
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+      `);
+    };
+
+    const addCheck = async (
+      table: string,
+      name: string,
+      expression: string,
+    ) => {
+      await queryRunner.query(`
+        DO $$ BEGIN
+          ALTER TABLE ${table}
+            ADD CONSTRAINT ${name} CHECK (${expression}) NOT VALID;
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$;
       `);
@@ -755,6 +782,42 @@ async function seed() {
       'menu_items',
       'id',
       'SET NULL',
+    );
+
+    // ============================================================
+    // CHECK CONSTRAINTS
+    // ============================================================
+    console.log('Creating check constraints...');
+
+    await addCheck(
+      'customer_sessions',
+      'ck_customer_sessions_unread_count_nonnegative',
+      'unread_count >= 0',
+    );
+    await addCheck(
+      'customer_sessions',
+      'ck_customer_sessions_guest_count_positive',
+      'guest_count IS NULL OR guest_count > 0',
+    );
+    await addCheck(
+      'customer_sessions',
+      'ck_customer_sessions_date_range',
+      'check_in_date IS NULL OR check_out_date IS NULL OR check_out_date >= check_in_date',
+    );
+    await addCheck(
+      'food_orders',
+      'ck_food_orders_total_amount_nonnegative',
+      'total_amount >= 0',
+    );
+    await addCheck(
+      'food_order_items',
+      'ck_food_order_items_unit_price_nonnegative',
+      'unit_price >= 0',
+    );
+    await addCheck(
+      'food_order_items',
+      'ck_food_order_items_quantity_positive',
+      'quantity > 0',
     );
 
     // ============================================================
