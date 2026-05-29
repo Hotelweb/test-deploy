@@ -29,13 +29,18 @@ export class FoodOrderStatsService {
     const stats = await this.orderRepo
       .createQueryBuilder('o')
       .select('COUNT(*)', 'total_orders')
-      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'PENDING')`, 'pending')
-      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'ACCEPTED')`, 'accepted')
-      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'REJECTED')`, 'rejected')
-      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'COMPLETED')`, 'completed')
-      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'CANCELLED')`, 'cancelled')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'new')`, 'pending')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'accepted')`, 'accepted')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'preparing')`, 'preparing')
       .addSelect(
-        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('ACCEPTED', 'COMPLETED')), 0)`,
+        `COUNT(*) FILTER (WHERE o.status = 'delivering')`,
+        'delivering',
+      )
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'rejected')`, 'rejected')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'completed')`, 'completed')
+      .addSelect(`COUNT(*) FILTER (WHERE o.status = 'cancelled')`, 'cancelled')
+      .addSelect(
+        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('accepted', 'preparing', 'delivering', 'completed')), 0)`,
         'total_revenue',
       )
       .addSelect(
@@ -43,7 +48,7 @@ export class FoodOrderStatsService {
         'orders_today',
       )
       .addSelect(
-        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('ACCEPTED', 'COMPLETED') AND o.created_at >= :todayStart), 0)`,
+        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('accepted', 'preparing', 'delivering', 'completed') AND o.created_at >= :todayStart), 0)`,
         'revenue_today',
       )
       .where('o.hotel_id = :hotelId', { hotelId, todayStart })
@@ -51,6 +56,8 @@ export class FoodOrderStatsService {
         total_orders: string;
         pending: string;
         accepted: string;
+        preparing: string;
+        delivering: string;
         rejected: string;
         completed: string;
         cancelled: string;
@@ -63,6 +70,8 @@ export class FoodOrderStatsService {
       total_orders: Number(stats?.total_orders ?? 0),
       pending_orders: Number(stats?.pending ?? 0),
       accepted_orders: Number(stats?.accepted ?? 0),
+      preparing_orders: Number(stats?.preparing ?? 0),
+      delivering_orders: Number(stats?.delivering ?? 0),
       rejected_orders: Number(stats?.rejected ?? 0),
       completed_orders: Number(stats?.completed ?? 0),
       cancelled_orders: Number(stats?.cancelled ?? 0),
@@ -73,11 +82,18 @@ export class FoodOrderStatsService {
   }
 
   async getAnalytics(hotelId: number): Promise<FoodOrderAnalytics> {
-    const servedStatuses: FoodOrderStatus[] = ['ACCEPTED', 'COMPLETED'];
+    const servedStatuses: FoodOrderStatus[] = [
+      'accepted',
+      'preparing',
+      'delivering',
+      'completed',
+    ];
     const activeStatuses: FoodOrderStatus[] = [
-      'PENDING',
-      'ACCEPTED',
-      'COMPLETED',
+      'new',
+      'accepted',
+      'preparing',
+      'delivering',
+      'completed',
     ];
 
     const topQuantityRows = await this.orderItemRepo
@@ -134,7 +150,7 @@ export class FoodOrderStatsService {
       )
       .addSelect('COUNT(*)', 'order_count')
       .addSelect(
-        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('ACCEPTED', 'COMPLETED')), 0)`,
+        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('accepted', 'preparing', 'delivering', 'completed')), 0)`,
         'total_revenue',
       )
       .where('o.hotel_id = :hotelId', { hotelId })
@@ -153,7 +169,7 @@ export class FoodOrderStatsService {
       .select('o.status', 'status')
       .addSelect('COUNT(*)', 'order_count')
       .addSelect(
-        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('ACCEPTED', 'COMPLETED')), 0)`,
+        `COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('accepted', 'preparing', 'delivering', 'completed')), 0)`,
         'total_revenue',
       )
       .where('o.hotel_id = :hotelId', { hotelId })

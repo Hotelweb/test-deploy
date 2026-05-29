@@ -126,7 +126,7 @@ async function seed() {
 
     await queryRunner.query(`
       DO $$ BEGIN
-        CREATE TYPE food_order_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'CANCELLED');
+        CREATE TYPE food_order_status AS ENUM ('new', 'accepted', 'preparing', 'delivering', 'completed', 'cancelled', 'rejected');
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);
@@ -145,6 +145,7 @@ async function seed() {
         phone VARCHAR(20),
         email VARCHAR(255),
         address TEXT,
+        map_url TEXT,
         description TEXT,
         logo_url TEXT,
         banner_url TEXT,
@@ -166,7 +167,22 @@ async function seed() {
 
     await queryRunner.query(`
       ALTER TABLE hotels
+        ADD COLUMN IF NOT EXISTS map_url TEXT;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE hotels
         ALTER COLUMN qr_token SET DEFAULT gen_random_uuid();
+    `);
+
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS hotel_qr_open_events (
+        id BIGSERIAL PRIMARY KEY,
+        hotel_id BIGINT NOT NULL,
+        source VARCHAR(20) NOT NULL,
+        room_token VARCHAR(120),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
 
     // System Admins
@@ -449,11 +465,13 @@ async function seed() {
         id BIGSERIAL PRIMARY KEY,
         hotel_id BIGINT NOT NULL,
         service_id BIGINT,
+        order_code VARCHAR(30) UNIQUE,
+        idempotency_key VARCHAR(80),
         room_number VARCHAR(50),
         customer_name VARCHAR(120),
         customer_phone VARCHAR(50),
         note TEXT,
-        status food_order_status NOT NULL DEFAULT 'PENDING',
+        status VARCHAR(20) NOT NULL DEFAULT 'new',
         total_amount DECIMAL(12,2) NOT NULL DEFAULT 0
           CONSTRAINT ck_food_orders_total_amount_nonnegative CHECK (total_amount >= 0),
         rejected_reason TEXT,

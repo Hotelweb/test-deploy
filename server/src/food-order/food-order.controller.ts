@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -31,15 +30,7 @@ import { UpdateFoodOrderStatusDto } from './dto/update-food-order-status.dto.js'
 import type { FoodOrderStatus } from './entities/food-order.entity.js';
 import { PaginationQueryDto } from '../common/pagination/pagination.dto.js';
 import { ChatGateway } from '../chat/chat.gateway.js';
-
-function assertHotelAccess(user: TokenPayload, hotelId: number) {
-  if (user.scope === 'system') return;
-  if (user.hotel_id !== hotelId) {
-    throw new ForbiddenException(
-      'Cannot access resources from a different hotel',
-    );
-  }
-}
+import { assertHotelAccess } from '../auth/hotel-access.js';
 
 @ApiTags('food-order')
 @Controller('food-order')
@@ -67,8 +58,10 @@ export class FoodOrderController {
   @Post('orders')
   @ApiOperation({ summary: 'Place a food/drink order (guest)' })
   @ApiResponse({ status: 201, description: 'Order created' })
-  createOrder(@Body() dto: CreateFoodOrderDto) {
-    return this.foodOrderService.createOrder(dto);
+  async createOrder(@Body() dto: CreateFoodOrderDto) {
+    const order = await this.foodOrderService.createOrder(dto);
+    this.chatGateway.emitOrderCreated(order);
+    return order;
   }
 
   @Get('orders/:id')

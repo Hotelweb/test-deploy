@@ -16,6 +16,7 @@ import {
   TranslationService,
   type TranslationResult,
 } from './translation.service.js';
+import { ChatReadActor } from './socket-events.js';
 
 const STAFF_LANGUAGE = 'vi';
 
@@ -218,12 +219,14 @@ export class ChatService {
 
   async markMessagesRead(
     sessionId: number,
-    by: 'customer' | 'staff',
+    by: ChatReadActor,
   ): Promise<{ updated: number }> {
     // Customer reading -> mark STAFF messages as read.
     // Staff reading    -> mark CUSTOMER messages as read AND zero session unread.
     const senderType =
-      by === 'customer' ? MessageSenderType.STAFF : MessageSenderType.CUSTOMER;
+      by === ChatReadActor.Customer
+        ? MessageSenderType.STAFF
+        : MessageSenderType.CUSTOMER;
 
     const result = await this.messageRepo
       .createQueryBuilder()
@@ -238,7 +241,7 @@ export class ChatService {
       .andWhere('is_read = FALSE')
       .execute();
 
-    if (by === 'staff') {
+    if (by === ChatReadActor.Staff) {
       await this.sessionRepo.update(sessionId, { unread_count: 0 });
     }
 
@@ -274,7 +277,7 @@ export class ChatService {
     } = input;
 
     const sameLang = dto.source_language === targetLanguage;
-    const isImage = dto.message_type === 'IMAGE';
+    const isImage = dto.message_type === MessageType.IMAGE;
 
     let translationStatus: TranslationStatus;
     if (isImage || sameLang) {

@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsEmail,
   IsInt,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -12,6 +13,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { MessageType } from '../entities/chat.entity.js';
 
 export class CreateSessionDto {
   @ApiProperty({ example: 1, description: 'Hotel ID' })
@@ -117,12 +119,12 @@ export class SendMessageDto {
   source_language: string;
 
   @ApiPropertyOptional({
-    example: 'TEXT',
+    example: MessageType.TEXT,
     description: 'Message type (TEXT | IMAGE)',
   })
   @IsOptional()
-  @IsString()
-  message_type?: 'TEXT' | 'IMAGE';
+  @IsIn([MessageType.TEXT, MessageType.IMAGE])
+  message_type?: MessageType.TEXT | MessageType.IMAGE;
 
   @ApiPropertyOptional({ description: 'Image URL when message_type=IMAGE' })
   @IsOptional()

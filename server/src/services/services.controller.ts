@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -26,19 +25,7 @@ import { CreateServiceDto } from './dto/create-service.dto.js';
 import { UpdateServiceDto } from './dto/update-service.dto.js';
 import { CurrentUser, JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { TokenPayload } from '../auth/token.service.js';
-
-/**
- * System admins have full access. Hotel users only see / mutate services
- * for the hotel their token is bound to.
- */
-function assertHotelAccess(user: TokenPayload, hotelId: number) {
-  if (user.scope === 'system') return;
-  if (user.hotel_id !== hotelId) {
-    throw new ForbiddenException(
-      'Cannot access services from a different hotel',
-    );
-  }
-}
+import { assertHotelAccess } from '../auth/hotel-access.js';
 
 @ApiTags('services')
 @Controller('services')

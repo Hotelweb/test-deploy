@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -84,8 +85,13 @@ export class HotelsController {
   })
   @ApiResponse({ status: 200, description: 'Hotel found' })
   @ApiResponse({ status: 404, description: 'Hotel not found or inactive' })
-  findByQr(@Param('qrToken') qrToken: string) {
-    return this.hotelsService.findByQrToken(qrToken);
+  async findByQr(
+    @Param('qrToken') qrToken: string,
+    @Query('room') roomToken?: string,
+  ) {
+    const hotel = await this.hotelsService.findByQrToken(qrToken);
+    await this.hotelsService.trackQrOpen(hotel.id, 'qr', roomToken);
+    return hotel;
   }
 
   @Get('slug/:slug')
@@ -99,8 +105,13 @@ export class HotelsController {
   })
   @ApiResponse({ status: 200, description: 'Hotel found' })
   @ApiResponse({ status: 404, description: 'Hotel not found or inactive' })
-  findBySlug(@Param('slug') slug: string) {
-    return this.hotelsService.findBySlug(slug);
+  async findBySlug(
+    @Param('slug') slug: string,
+    @Query('room') roomToken?: string,
+  ) {
+    const hotel = await this.hotelsService.findBySlug(slug);
+    await this.hotelsService.trackQrOpen(hotel.id, 'slug', roomToken);
+    return hotel;
   }
 
   @Get(':id')

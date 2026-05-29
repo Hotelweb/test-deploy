@@ -43,6 +43,7 @@ export function toOrderView(order: FoodOrder): FoodOrderView {
     id: Number(order.id),
     hotel_id: Number(order.hotel_id),
     service_id: order.service_id ? Number(order.service_id) : null,
+    order_code: order.order_code,
     room_number: order.room_number,
     customer_name: order.customer_name,
     customer_phone: order.customer_phone,

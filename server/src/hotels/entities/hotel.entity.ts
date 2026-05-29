@@ -27,6 +27,9 @@ export class Hotel {
   address: string;
 
   @Column({ type: 'text', nullable: true })
+  map_url: string;
+
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ type: 'text', nullable: true })

@@ -29,6 +29,7 @@ import {
 } from '../auth/jwt-auth.guard.js';
 import type { TokenPayload } from '../auth/token.service.js';
 import { assertHotelAccess } from '../auth/hotel-access.js';
+import { ChatReadActor } from './socket-events.js';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -83,12 +84,12 @@ export class ChatController {
   @Post('sessions/:id/read')
   @ApiOperation({ summary: 'Mark messages as read (customer)' })
   @ApiParam({ name: 'id', description: 'Session ID' })
-  @ApiQuery({ name: 'by', enum: ['customer', 'staff'] })
+  @ApiQuery({ name: 'by', enum: ChatReadActor })
   markReadGuest(
     @Param('id', ParseIntPipe) id: number,
-    @Query('by') by: 'customer' | 'staff' = 'customer',
+    @Query('by') by: ChatReadActor = ChatReadActor.Customer,
   ) {
-    if (by !== 'customer') {
+    if (by !== ChatReadActor.Customer) {
       throw new ForbiddenException('Staff read requires authentication');
     }
     return this.chatService.markMessagesRead(id, by);
@@ -142,7 +143,7 @@ export class ChatController {
   ) {
     const session = await this.chatService.getSession(id);
     assertHotelAccess(user, Number(session.hotel_id));
-    return this.chatService.markMessagesRead(id, 'staff');
+    return this.chatService.markMessagesRead(id, ChatReadActor.Staff);
   }
 
   @Get('hotel/:hotelId/sessions')

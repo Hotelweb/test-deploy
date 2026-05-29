@@ -29,6 +29,11 @@ export class UpdateHotelDto {
   @IsString()
   address?: string;
 
+  @ApiPropertyOptional({ example: 'https://maps.google.com/?q=Grand+Palace' })
+  @IsOptional()
+  @IsString()
+  map_url?: string;
+
   @ApiPropertyOptional({ example: 'Luxury 5-star hotel' })
   @IsOptional()
   @IsString()

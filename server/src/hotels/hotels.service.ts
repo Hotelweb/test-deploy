@@ -8,6 +8,7 @@ import { DataSource, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { Hotel } from './entities/hotel.entity.js';
+import { HotelQrOpenEvent } from './entities/hotel-qr-open-event.entity.js';
 import { HotelUser } from '../hotel-users/entities/hotel-user.entity.js';
 import { CreateHotelDto } from './dto/create-hotel.dto.js';
 import { UpdateHotelDto } from './dto/update-hotel.dto.js';
@@ -17,6 +18,8 @@ export class HotelsService {
   constructor(
     @InjectRepository(Hotel)
     private readonly hotelRepo: Repository<Hotel>,
+    @InjectRepository(HotelQrOpenEvent)
+    private readonly qrOpenRepo: Repository<HotelQrOpenEvent>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -53,6 +56,7 @@ export class HotelsService {
         phone: dto.phone,
         email: dto.email,
         address: dto.address,
+        map_url: dto.map_url,
         description: dto.description,
         qr_token: qrToken,
       });
@@ -162,6 +166,7 @@ export class HotelsService {
     if (dto.phone !== undefined) hotel.phone = dto.phone;
     if (dto.email !== undefined) hotel.email = dto.email;
     if (dto.address !== undefined) hotel.address = dto.address;
+    if (dto.map_url !== undefined) hotel.map_url = dto.map_url;
     if (dto.description !== undefined) hotel.description = dto.description;
     if (dto.logo_url !== undefined) hotel.logo_url = dto.logo_url;
     if (dto.banner_url !== undefined) hotel.banner_url = dto.banner_url;
@@ -169,6 +174,24 @@ export class HotelsService {
     if (dto.is_active !== undefined) hotel.is_active = dto.is_active;
 
     return this.hotelRepo.save(hotel);
+  }
+
+  async trackQrOpen(
+    hotelId: number,
+    source: 'slug' | 'qr',
+    roomToken?: string,
+  ): Promise<void> {
+    const enabled =
+      (process.env.ANALYTICS_ENABLED ?? 'false').toLowerCase() === 'true';
+    if (!enabled) return;
+
+    await this.qrOpenRepo.save(
+      this.qrOpenRepo.create({
+        hotel_id: hotelId,
+        source,
+        room_token: roomToken?.trim() || null,
+      }),
+    );
   }
 
   /**
