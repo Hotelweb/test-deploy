@@ -12,6 +12,7 @@ import {
 } from '../../common/pagination/pagination.dto.js';
 import { CreateFoodOrderDto } from '../dto/create-food-order.dto.js';
 import { UpdateFoodOrderStatusDto } from '../dto/update-food-order-status.dto.js';
+import { AssignFoodOrderDto } from '../dto/assign-food-order.dto.js';
 import {
   FoodOrder,
   FoodOrderItem,
@@ -145,6 +146,7 @@ export class OrderManagementService {
   async updateOrderStatus(
     id: number,
     dto: UpdateFoodOrderStatusDto,
+    handledBy?: number,
   ): Promise<FoodOrderView> {
     const order = await this.findOrder(id);
 
@@ -160,12 +162,28 @@ export class OrderManagementService {
     }
 
     order.status = dto.status;
+    if (handledBy) {
+      order.last_handled_by = handledBy;
+      order.handled_at = new Date();
+    }
     if (dto.status === 'rejected') {
       order.rejected_reason = dto.rejected_reason?.trim() ?? null;
     } else if (dto.status === 'accepted') {
       order.rejected_reason = null;
     }
 
+    const saved = await this.orderRepo.save(order);
+    return toOrderView(saved);
+  }
+
+  async assignOrder(
+    id: number,
+    dto: AssignFoodOrderDto,
+  ): Promise<FoodOrderView> {
+    const order = await this.findOrder(id);
+    order.assigned_to_user_id = dto.assigned_to_user_id ?? null;
+    order.assigned_group = dto.assigned_group?.trim() || null;
+    order.assigned_at = new Date();
     const saved = await this.orderRepo.save(order);
     return toOrderView(saved);
   }

@@ -51,6 +51,13 @@ export function toOrderView(order: FoodOrder): FoodOrderView {
     status: order.status,
     total_amount: Number(order.total_amount),
     rejected_reason: order.rejected_reason,
+    assigned_to_user_id: order.assigned_to_user_id
+      ? Number(order.assigned_to_user_id)
+      : null,
+    assigned_group: order.assigned_group,
+    assigned_at: order.assigned_at,
+    last_handled_by: order.last_handled_by ? Number(order.last_handled_by) : null,
+    handled_at: order.handled_at,
     items,
     created_at: order.created_at,
     updated_at: order.updated_at,

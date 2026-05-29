@@ -1,4 +1,5 @@
 import { clearAuth, getToken } from '../lib/auth'
+import type { HotelStaffRole } from '../lib/auth'
 
 const API_BASE = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000'
 
@@ -46,6 +47,7 @@ export interface Hotel {
   phone: string | null
   email: string | null
   address: string | null
+  map_url: string | null
   description: string | null
   logo_url: string | null
   banner_url: string | null
@@ -64,9 +66,20 @@ export interface HotelUser {
   email: string
   full_name: string
   avatar_url: string | null
+  role: HotelStaffRole
   is_active: boolean
+  last_login_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface CreateHotelUserInput {
+  hotel_id: number
+  email: string
+  password: string
+  full_name: string
+  avatar_url?: string
+  role?: HotelStaffRole
 }
 
 export interface CreateHotelInput {
@@ -74,6 +87,7 @@ export interface CreateHotelInput {
   phone?: string
   email?: string
   address?: string
+  map_url?: string
   description?: string
   manager_email?: string
   manager_password?: string
@@ -152,7 +166,7 @@ export interface UpdateServiceInput {
 
 // ---- Chat types ----------------------------------------------------------
 
-export type ChatSessionStatus = 'OPEN' | 'ASSIGNED' | 'BOOKED' | 'CLOSED'
+export type ChatSessionStatus = 'OPEN' | 'PENDING' | 'ASSIGNED' | 'RESOLVED' | 'BOOKED' | 'CLOSED'
 export type MessageSenderType = 'CUSTOMER' | 'STAFF'
 export type MessageType = 'TEXT' | 'IMAGE' | 'SYSTEM' | 'ORDER'
 export type MessageStatus = 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'
@@ -178,6 +192,12 @@ export interface ChatSession {
   privacy_consent: boolean
   analytics_consent: boolean
   status: ChatSessionStatus
+  assigned_user_id: number | null
+  assigned_group: string | null
+  assigned_at: string | null
+  last_handled_by: number | null
+  handled_at: string | null
+  internal_note: string | null
   unread_count: number
   last_message_at: string | null
   closed_at: string | null
@@ -309,12 +329,19 @@ export const uploadImage = async (
 export const getHotelUsers = (hotelId: number) =>
   fetchApi<HotelUser[]>(`/hotel-users?hotel_id=${hotelId}`)
 
+export const createHotelUser = (data: CreateHotelUserInput) =>
+  fetchApi<HotelUser>('/hotel-users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+
 export interface UpdateHotelUserInput {
   email?: string
   password?: string
   full_name?: string
   avatar_url?: string
   is_active?: boolean
+  role?: HotelStaffRole
 }
 
 export const updateHotelUser = (id: number, data: UpdateHotelUserInput) =>
@@ -350,7 +377,14 @@ export const deleteService = (id: number) => fetchApi<void>(`/services/${id}`, {
 // ---- Food order ----------------------------------------------------------
 
 export type MenuCategory = 'food' | 'drink'
-export type FoodOrderStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED'
+export type FoodOrderStatus =
+  | 'new'
+  | 'accepted'
+  | 'preparing'
+  | 'delivering'
+  | 'completed'
+  | 'cancelled'
+  | 'rejected'
 
 export interface MenuItem {
   id: number
@@ -382,6 +416,7 @@ export interface FoodOrder {
   id: number
   hotel_id: number
   service_id: number | null
+  order_code: string | null
   room_number: string | null
   customer_name: string | null
   customer_phone: string | null
@@ -389,6 +424,11 @@ export interface FoodOrder {
   status: FoodOrderStatus
   total_amount: number
   rejected_reason: string | null
+  assigned_to_user_id: number | null
+  assigned_group: string | null
+  assigned_at: string | null
+  last_handled_by: number | null
+  handled_at: string | null
   items: FoodOrderLine[]
   created_at: string
   updated_at: string
@@ -398,6 +438,8 @@ export interface FoodOrderStats {
   total_orders: number
   pending_orders: number
   accepted_orders: number
+  preparing_orders: number
+  delivering_orders: number
   rejected_orders: number
   completed_orders: number
   cancelled_orders: number
@@ -488,6 +530,7 @@ export interface CreateFoodOrderInput {
   room_number?: string
   customer_name?: string
   customer_phone?: string
+  idempotency_key?: string
   note?: string
   items: { menu_item_id: number; quantity: number }[]
 }
@@ -542,6 +585,15 @@ export const updateFoodOrderStatus = (
   data: { status: FoodOrderStatus; rejected_reason?: string },
 ) =>
   fetchApi<FoodOrder>(`/food-order/admin/orders/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+
+export const assignFoodOrder = (
+  id: number,
+  data: { assigned_to_user_id?: number | null; assigned_group?: string | null },
+) =>
+  fetchApi<FoodOrder>(`/food-order/admin/orders/${id}/assignment`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
@@ -606,6 +658,21 @@ export const updateSessionStatus = (sessionId: number, status: ChatSessionStatus
     body: JSON.stringify({ status }),
   })
 
+export const assignChatSession = (
+  sessionId: number,
+  data: { assigned_to_user_id?: number | null; assigned_group?: string | null },
+) =>
+  fetchApi<ChatSession>(`/chat/sessions/${sessionId}/assignment`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+
+export const updateChatInternalNote = (sessionId: number, internal_note: string) =>
+  fetchApi<ChatSession>(`/chat/sessions/${sessionId}/internal-note`, {
+    method: 'PATCH',
+    body: JSON.stringify({ internal_note }),
+  })
+
 export const markSessionRead = (sessionId: number, by: 'customer' | 'staff') =>
   fetchApi<{ updated: number }>(
     by === 'staff'
@@ -644,8 +711,10 @@ export interface LoginResponse {
     full_name: string
     scope: 'system' | 'hotel'
     hotel_id?: number
+    role?: HotelStaffRole
     avatar_url?: string | null
     is_active: boolean
+    last_login_at?: string | null
   }
 }
 

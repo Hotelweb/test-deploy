@@ -2,10 +2,12 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
+import { HotelStaffRole } from '../entities/hotel-user.entity.js';
 
 export class UpdateHotelUserDto {
   @ApiPropertyOptional({ example: 'newemail@hotel.vn' })
@@ -33,4 +35,12 @@ export class UpdateHotelUserDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({
+    enum: HotelStaffRole,
+    example: HotelStaffRole.RECEPTION,
+  })
+  @IsOptional()
+  @IsEnum(HotelStaffRole)
+  role?: HotelStaffRole;
 }

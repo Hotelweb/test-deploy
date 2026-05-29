@@ -137,12 +137,43 @@ export class ChatService {
   async updateSessionStatus(
     sessionId: number,
     status: ChatSessionStatus,
+    handledBy?: number,
   ): Promise<CustomerSession> {
     const session = await this.getSession(sessionId);
     session.status = status;
-    if (status === ChatSessionStatus.CLOSED) {
+    if (handledBy) {
+      session.last_handled_by = handledBy;
+      session.handled_at = new Date();
+    }
+    if (
+      status === ChatSessionStatus.CLOSED ||
+      status === ChatSessionStatus.RESOLVED
+    ) {
       session.closed_at = new Date();
     }
+    return this.sessionRepo.save(session);
+  }
+
+  async assignSession(
+    sessionId: number,
+    input: { assigned_to_user_id?: number; assigned_group?: string },
+  ): Promise<CustomerSession> {
+    const session = await this.getSession(sessionId);
+    session.assigned_user_id = input.assigned_to_user_id ?? null;
+    session.assigned_group = input.assigned_group?.trim() || null;
+    session.assigned_at = new Date();
+    if (session.status === ChatSessionStatus.OPEN) {
+      session.status = ChatSessionStatus.ASSIGNED;
+    }
+    return this.sessionRepo.save(session);
+  }
+
+  async updateInternalNote(
+    sessionId: number,
+    note?: string,
+  ): Promise<CustomerSession> {
+    const session = await this.getSession(sessionId);
+    session.internal_note = note?.trim() || null;
     return this.sessionRepo.save(session);
   }
 
@@ -211,7 +242,10 @@ export class ChatService {
     if (session.status === ChatSessionStatus.OPEN) {
       session.status = ChatSessionStatus.ASSIGNED;
       session.assigned_user_id = userId;
+      session.assigned_at = new Date();
     }
+    session.last_handled_by = userId;
+    session.handled_at = new Date();
     await this.sessionRepo.save(session);
 
     return saved;

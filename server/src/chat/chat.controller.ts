@@ -30,6 +30,12 @@ import {
 import type { TokenPayload } from '../auth/token.service.js';
 import { assertHotelAccess } from '../auth/hotel-access.js';
 import { ChatReadActor } from './socket-events.js';
+import {
+  UpdateChatAssignmentDto,
+  UpdateChatInternalNoteDto,
+} from './dto/update-chat-assignment.dto.js';
+import { assertPermission } from '../auth/permissions.js';
+import { AuditLogService } from '../audit-log/audit-log.service.js';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -37,6 +43,7 @@ export class ChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly translationService: TranslationService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -112,6 +119,7 @@ export class ChatController {
   ) {
     const session = await this.chatService.getSession(id);
     assertHotelAccess(user, Number(session.hotel_id));
+    assertPermission(user, 'chat:handle');
     return this.chatService.sendStaffMessage(id, user.sub, dto);
   }
 
@@ -128,7 +136,64 @@ export class ChatController {
   ) {
     const session = await this.chatService.getSession(id);
     assertHotelAccess(user, Number(session.hotel_id));
-    return this.chatService.updateSessionStatus(id, body.status);
+    assertPermission(user, 'chat:handle');
+    const updated = await this.chatService.updateSessionStatus(
+      id,
+      body.status,
+      user.sub,
+    );
+    void this.auditLog.record({
+      actor: user,
+      hotelId: Number(session.hotel_id),
+      action:
+        body.status === ChatSessionStatus.RESOLVED ||
+        body.status === ChatSessionStatus.CLOSED
+          ? 'conversation.resolved'
+          : 'conversation.status_changed',
+      targetType: 'chat_session',
+      targetId: id,
+      metadata: { from: session.status, to: body.status },
+    });
+    return updated;
+  }
+
+  @Patch('sessions/:id/assignment')
+  @UseGuards(JwtAuthGuard)
+  @RequireScopes('system', 'hotel')
+  @ApiBearerAuth()
+  async updateAssignment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateChatAssignmentDto,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    const session = await this.chatService.getSession(id);
+    assertHotelAccess(user, Number(session.hotel_id));
+    assertPermission(user, 'chat:handle');
+    const updated = await this.chatService.assignSession(id, dto);
+    void this.auditLog.record({
+      actor: user,
+      hotelId: Number(session.hotel_id),
+      action: 'chat.assigned',
+      targetType: 'chat_session',
+      targetId: id,
+      metadata: dto as Record<string, unknown>,
+    });
+    return updated;
+  }
+
+  @Patch('sessions/:id/internal-note')
+  @UseGuards(JwtAuthGuard)
+  @RequireScopes('system', 'hotel')
+  @ApiBearerAuth()
+  async updateInternalNote(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateChatInternalNoteDto,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    const session = await this.chatService.getSession(id);
+    assertHotelAccess(user, Number(session.hotel_id));
+    assertPermission(user, 'chat:handle');
+    return this.chatService.updateInternalNote(id, dto.internal_note);
   }
 
   @Post('sessions/:id/read/staff')
@@ -143,6 +208,7 @@ export class ChatController {
   ) {
     const session = await this.chatService.getSession(id);
     assertHotelAccess(user, Number(session.hotel_id));
+    assertPermission(user, 'chat:handle');
     return this.chatService.markMessagesRead(id, ChatReadActor.Staff);
   }
 
@@ -159,6 +225,7 @@ export class ChatController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, hotelId);
+    assertPermission(user, 'chat:handle');
     return this.chatService.getHotelSessions(hotelId);
   }
 

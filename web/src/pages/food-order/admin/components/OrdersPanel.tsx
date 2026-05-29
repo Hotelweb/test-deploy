@@ -14,6 +14,7 @@ interface OrdersPanelProps {
   onFilterChange: (filter: OrderFilter) => void
   onPageChange: (page: number) => void
   onAction: (order: FoodOrder, status: FoodOrderStatus) => void
+  onAssignToMe: (order: FoodOrder) => void
 }
 
 export function OrdersPanel({
@@ -26,6 +27,7 @@ export function OrdersPanel({
   onFilterChange,
   onPageChange,
   onAction,
+  onAssignToMe,
 }: OrdersPanelProps) {
   const [selectedOrder, setSelectedOrder] = useState<FoodOrder | null>(null)
   const totalCount = meta?.total_count ?? counts[filter]
@@ -119,7 +121,13 @@ export function OrdersPanel({
       ) : (
         <div className="space-y-2.5">
           {orders.map((order) => (
-            <OrderCard key={order.id} order={order} onOpen={setSelectedOrder} onAction={onAction} />
+              <OrderCard
+                key={order.id}
+                order={order}
+                onOpen={setSelectedOrder}
+                onAction={onAction}
+                onAssignToMe={onAssignToMe}
+              />
           ))}
         </div>
       )}
@@ -132,6 +140,7 @@ export function OrdersPanel({
             onAction(order, status)
             setSelectedOrder(null)
           }}
+          onAssignToMe={onAssignToMe}
         />
       ) : null}
     </div>

@@ -3,6 +3,7 @@ import { PaginationQueryDto } from '../common/pagination/pagination.dto.js';
 import { CreateFoodOrderDto } from './dto/create-food-order.dto.js';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto.js';
 import { UpdateFoodOrderStatusDto } from './dto/update-food-order-status.dto.js';
+import { AssignFoodOrderDto } from './dto/assign-food-order.dto.js';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto.js';
 import type { FoodOrderStatus } from './entities/food-order.entity.js';
 import type { MenuItem } from './entities/menu-item.entity.js';
@@ -79,8 +80,13 @@ export class FoodOrderService {
   updateOrderStatus(
     id: number,
     dto: UpdateFoodOrderStatusDto,
+    handledBy?: number,
   ): Promise<FoodOrderView> {
-    return this.orderManagement.updateOrderStatus(id, dto);
+    return this.orderManagement.updateOrderStatus(id, dto, handledBy);
+  }
+
+  assignOrder(id: number, dto: AssignFoodOrderDto): Promise<FoodOrderView> {
+    return this.orderManagement.assignOrder(id, dto);
   }
 
   getStats(hotelId: number): Promise<FoodOrderStats> {

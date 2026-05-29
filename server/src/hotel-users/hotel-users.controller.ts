@@ -24,6 +24,8 @@ import { CreateHotelUserDto } from './dto/create-hotel-user.dto.js';
 import { UpdateHotelUserDto } from './dto/update-hotel-user.dto.js';
 import { CurrentUser, JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { TokenPayload } from '../auth/token.service.js';
+import { assertPermission } from '../auth/permissions.js';
+import { AuditLogService } from '../audit-log/audit-log.service.js';
 
 /**
  * System admins have full access. Hotel users (any role) only see / mutate
@@ -41,7 +43,10 @@ function assertHotelAccess(user: TokenPayload, hotelId: number) {
 @UseGuards(JwtAuthGuard)
 @Controller('hotel-users')
 export class HotelUsersController {
-  constructor(private readonly hotelUsersService: HotelUsersService) {}
+  constructor(
+    private readonly hotelUsersService: HotelUsersService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -55,9 +60,19 @@ export class HotelUsersController {
     status: 409,
     description: 'Email already exists for this hotel',
   })
-  create(@Body() dto: CreateHotelUserDto, @CurrentUser() user: TokenPayload) {
+  async create(@Body() dto: CreateHotelUserDto, @CurrentUser() user: TokenPayload) {
     assertHotelAccess(user, dto.hotel_id);
-    return this.hotelUsersService.create(dto);
+    assertPermission(user, 'users:manage');
+    const created = await this.hotelUsersService.create(dto);
+    void this.auditLog.record({
+      actor: user,
+      hotelId: dto.hotel_id,
+      action: 'user.created',
+      targetType: 'hotel_user',
+      targetId: Number(created.id),
+      metadata: { role: dto.role },
+    });
+    return created;
   }
 
   @Get()
@@ -75,6 +90,7 @@ export class HotelUsersController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, hotelId);
+    assertPermission(user, 'users:manage');
     return this.hotelUsersService.findAllByHotel(hotelId);
   }
 
@@ -89,6 +105,7 @@ export class HotelUsersController {
   ) {
     const target = await this.hotelUsersService.findOne(id);
     assertHotelAccess(user, Number(target.hotel_id));
+    assertPermission(user, 'users:manage');
     return target;
   }
 
@@ -112,7 +129,23 @@ export class HotelUsersController {
   ) {
     const target = await this.hotelUsersService.findOne(id);
     assertHotelAccess(user, Number(target.hotel_id));
-    return this.hotelUsersService.update(id, dto);
+    assertPermission(user, 'users:manage');
+    const updated = await this.hotelUsersService.update(id, dto);
+    if (dto.role !== undefined || dto.is_active !== undefined || dto.password) {
+      void this.auditLog.record({
+        actor: user,
+        hotelId: Number(target.hotel_id),
+        action: dto.role !== undefined ? 'user.role_updated' : 'user.updated',
+        targetType: 'hotel_user',
+        targetId: id,
+        metadata: {
+          role: dto.role,
+          is_active: dto.is_active,
+          password_reset: Boolean(dto.password),
+        },
+      });
+    }
+    return updated;
   }
 
   @Delete(':id')
@@ -130,6 +163,7 @@ export class HotelUsersController {
   ) {
     const target = await this.hotelUsersService.findOne(id);
     assertHotelAccess(user, Number(target.hotel_id));
+    assertPermission(user, 'users:manage');
     return this.hotelUsersService.softDelete(id);
   }
 }

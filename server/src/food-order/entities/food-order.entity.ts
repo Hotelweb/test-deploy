@@ -59,6 +59,21 @@ export class FoodOrder {
   @Column({ type: 'text', nullable: true })
   rejected_reason!: string | null;
 
+  @Column({ type: 'bigint', nullable: true })
+  assigned_to_user_id!: number | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  assigned_group!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  assigned_at!: Date | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  last_handled_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  handled_at!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;
 

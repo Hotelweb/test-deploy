@@ -38,6 +38,11 @@ export interface FoodOrderView {
   status: FoodOrderStatus;
   total_amount: number;
   rejected_reason: string | null;
+  assigned_to_user_id: number | null;
+  assigned_group: string | null;
+  assigned_at: Date | null;
+  last_handled_by: number | null;
+  handled_at: Date | null;
   items: FoodOrderItemView[];
   created_at: Date;
   updated_at: Date;

@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { TokenService } from './token.service.js';
+import { AuditLogModule } from '../audit-log/audit-log.module.js';
 
 /**
  * Global so other modules can `@UseGuards(JwtAuthGuard)` without re-importing.
@@ -15,7 +16,11 @@ import { TokenService } from './token.service.js';
  */
 @Global()
 @Module({
-  imports: [ConfigModule, TypeOrmModule.forFeature([SystemAdmin, HotelUser])],
+  imports: [
+    ConfigModule,
+    TypeOrmModule.forFeature([SystemAdmin, HotelUser]),
+    AuditLogModule,
+  ],
   controllers: [AuthController],
   providers: [AuthService, TokenService, JwtAuthGuard],
   exports: [TokenService, JwtAuthGuard, AuthService],

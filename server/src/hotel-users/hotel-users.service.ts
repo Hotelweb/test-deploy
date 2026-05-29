@@ -37,6 +37,7 @@ export class HotelUsersService {
       password_hash: passwordHash,
       full_name: dto.full_name,
       avatar_url: dto.avatar_url,
+      role: dto.role,
     });
 
     return this.hotelUserRepo.save(user);
@@ -89,6 +90,7 @@ export class HotelUsersService {
     if (dto.full_name !== undefined) user.full_name = dto.full_name;
     if (dto.avatar_url !== undefined) user.avatar_url = dto.avatar_url;
     if (dto.is_active !== undefined) user.is_active = dto.is_active;
+    if (dto.role !== undefined) user.role = dto.role;
 
     return this.hotelUserRepo.save(user);
   }

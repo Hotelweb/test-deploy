@@ -10,3 +10,4 @@ tfplan
 *.log
 .DS_Store
 .agents/
+.codex/

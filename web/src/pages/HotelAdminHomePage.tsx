@@ -12,10 +12,12 @@ import {
   HotelIcon,
   InRoomDiningIcon,
   ServicesIcon,
+  PeopleIcon,
 } from '../components/icons/ServiceIcons'
 import { useAuth } from '../hooks/useAuth'
 import { useHotelAdminNotifications } from '../hooks/useHotelAdminNotifications'
 import type { AdminNotificationItem } from '../hooks/useHotelAdminNotifications'
+import { can } from '../lib/permissions'
 
 export function HotelAdminHomePage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()
@@ -74,6 +76,7 @@ export function HotelAdminHomePage() {
       icon: ChatIcon,
       tone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
       onClick: () => navigate(`/admin/${hotelId}/chat`),
+      permission: 'chat:handle' as const,
     },
     {
       title: 'Quản lý đơn hàng',
@@ -82,6 +85,7 @@ export function HotelAdminHomePage() {
       icon: InRoomDiningIcon,
       tone: 'bg-orange-50 text-orange-700 border-orange-100',
       onClick: () => navigate(`/admin/${hotelId}/food-order`),
+      permission: 'orders:view' as const,
     },
     {
       title: 'Thêm dịch vụ',
@@ -90,6 +94,16 @@ export function HotelAdminHomePage() {
       icon: ServicesIcon,
       tone: 'bg-emerald-50 text-primary border-emerald-100',
       onClick: () => navigate(`/admin/${hotelId}/services`),
+      permission: 'services:manage' as const,
+    },
+    {
+      title: 'Nhân viên',
+      description: 'Tạo tài khoản, phân vai trò, khóa/mở và đặt lại mật khẩu cho nhân viên.',
+      buttonLabel: 'Quản lý nhân viên',
+      icon: PeopleIcon,
+      tone: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+      onClick: () => navigate(`/admin/${hotelId}/staff`),
+      permission: 'users:manage' as const,
     },
     {
       title: 'Xem trang khách',
@@ -100,7 +114,7 @@ export function HotelAdminHomePage() {
       onClick: () => hotel && navigate(`/hotel/${hotel.slug}`),
       disabled: !hotel,
     },
-  ]
+  ].filter((action) => !action.permission || can(auth?.user, action.permission))
 
   return (
     <div className="min-h-screen bg-background-warm">

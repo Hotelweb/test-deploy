@@ -9,12 +9,23 @@ import {
 } from 'typeorm';
 import { Hotel } from '../../hotels/entities/hotel.entity.js';
 
+export enum HotelStaffRole {
+  HOTEL_ADMIN = 'hotel_admin',
+  RECEPTION = 'reception',
+  CASHIER = 'cashier',
+  FNB_STAFF = 'fnb_staff',
+  KITCHEN_STAFF = 'kitchen_staff',
+  CUSTOMER_CARE = 'customer_care',
+  CONTENT_MANAGER = 'content_manager',
+  MANAGER = 'manager',
+}
+
 /**
- * A hotel admin – the manager / owner account scoped to a single hotel.
+ * A hotel-scoped staff account.
  *
  * The system has only two user types: a single root system admin (table
- * `system_admins`) and per-hotel admins (this table). Every row here
- * represents an authoritative manager for `hotel_id`.
+ * `system_admins`) and per-hotel staff users (this table). Role is intentionally
+ * coarse-grained for now; permissions are derived in auth/permissions.ts.
  */
 @Entity('hotel_users')
 export class HotelUser {
@@ -36,8 +47,19 @@ export class HotelUser {
   @Column({ type: 'text', nullable: true })
   avatar_url: string;
 
+  @Column({
+    type: 'enum',
+    enum: HotelStaffRole,
+    enumName: 'hotel_staff_role',
+    default: HotelStaffRole.HOTEL_ADMIN,
+  })
+  role: HotelStaffRole;
+
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  last_login_at: Date;
 
   @Column({ type: 'timestamptz', nullable: true })
   deleted_at: Date;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   deleteMenuItem,
+  assignFoodOrder,
   getAdminFoodOrders,
   getAdminMenu,
   getFoodOrderAnalytics,
@@ -16,7 +17,9 @@ import {
   type MenuItem,
   type PaginatedResponse,
 } from '../../../../api'
+import { useAuth } from '../../../../hooks/useAuth'
 import { playNotificationSound } from '../../../../lib/notifications'
+import { useChatSocket } from '../../../../hooks/useChatSocket'
 import type { OrderFilter, Tab } from '../consts'
 
 export type MenuModalState = { mode: 'create' } | { mode: 'edit'; item: MenuItem } | null
@@ -24,6 +27,7 @@ export type MenuModalState = { mode: 'create' } | { mode: 'edit'; item: MenuItem
 const ORDERS_PER_PAGE = 20
 
 export function useFoodOrderAdmin(hotelId: number) {
+  const auth = useAuth()
   const [hotel, setHotel] = useState<Hotel | null>(null)
   const [tab, setTab] = useState<Tab>('orders')
   const [stats, setStats] = useState<FoodOrderStats | null>(null)
@@ -41,11 +45,13 @@ export function useFoodOrderAdmin(hotelId: number) {
   const orderCounts = useMemo(
     () => ({
       all: stats?.total_orders ?? 0,
-      PENDING: stats?.pending_orders ?? 0,
-      ACCEPTED: stats?.accepted_orders ?? 0,
-      COMPLETED: stats?.completed_orders ?? 0,
-      REJECTED: stats?.rejected_orders ?? 0,
-      CANCELLED: stats?.cancelled_orders ?? 0,
+      new: stats?.pending_orders ?? 0,
+      accepted: stats?.accepted_orders ?? 0,
+      preparing: stats?.preparing_orders ?? 0,
+      delivering: stats?.delivering_orders ?? 0,
+      completed: stats?.completed_orders ?? 0,
+      rejected: stats?.rejected_orders ?? 0,
+      cancelled: stats?.cancelled_orders ?? 0,
     }),
     [stats],
   )
@@ -139,7 +145,7 @@ export function useFoodOrderAdmin(hotelId: number) {
 
   const handleOrderAction = async (order: FoodOrder, status: FoodOrderStatus) => {
     let rejected_reason: string | undefined
-    if (status === 'REJECTED') {
+    if (status === 'rejected') {
       const reason = window.prompt('Lý do từ chối đơn hàng:')
       if (!reason?.trim()) return
       rejected_reason = reason.trim()
@@ -158,6 +164,16 @@ export function useFoodOrderAdmin(hotelId: number) {
       void loadOrders()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Không cập nhật được')
+    }
+  }
+
+  const handleAssignOrderToMe = async (order: FoodOrder) => {
+    if (!auth?.user.id) return
+    try {
+      const updated = await assignFoodOrder(order.id, { assigned_to_user_id: auth.user.id })
+      setOrders((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Không gán được đơn hàng')
     }
   }
 
@@ -189,6 +205,30 @@ export function useFoodOrderAdmin(hotelId: number) {
     setOrderPage(1)
   }
 
+  useChatSocket({
+    hotelId,
+    role: 'staff',
+    onOrderCreated: ({ order }) => {
+      playNotificationSound()
+      if (orderFilter === 'all' || order.status === orderFilter) {
+        setOrders((prev) => [order, ...prev.filter((item) => item.id !== order.id)])
+      }
+      setPendingCount((count) => count + (order.status === 'new' ? 1 : 0))
+      void Promise.all([
+        getFoodOrderStats(hotelId).then(setStats),
+        getFoodOrderAnalytics(hotelId).then(setAnalytics),
+      ])
+    },
+    onOrderStatusChanged: ({ order }) => {
+      setOrders((prev) => prev.map((item) => (item.id === order.id ? order : item)))
+      void Promise.all([
+        getFoodOrderStats(hotelId).then(setStats),
+        getFoodOrderAnalytics(hotelId).then(setAnalytics),
+        getPendingOrderCount(hotelId).then(setPendingCount),
+      ])
+    },
+  })
+
   return {
     hotel,
     tab,
@@ -209,6 +249,7 @@ export function useFoodOrderAdmin(hotelId: number) {
     orderCounts,
     orders,
     handleOrderAction,
+    handleAssignOrderToMe,
     handleDeleteMenu,
     handleMenuSaved,
   }

@@ -54,6 +54,7 @@ export function FoodOrderAdminPage() {
             onFilterChange={admin.setOrderFilter}
             onPageChange={admin.setOrderPage}
             onAction={admin.handleOrderAction}
+            onAssignToMe={admin.handleAssignOrderToMe}
           />
         ) : null}
 

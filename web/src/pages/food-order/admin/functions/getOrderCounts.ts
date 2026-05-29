@@ -4,11 +4,13 @@ import type { OrderFilter } from '../consts'
 export function getOrderCounts(orders: FoodOrder[]): Record<OrderFilter, number> {
   return {
     all: orders.length,
-    PENDING: countByStatus(orders, 'PENDING'),
-    ACCEPTED: countByStatus(orders, 'ACCEPTED'),
-    COMPLETED: countByStatus(orders, 'COMPLETED'),
-    REJECTED: countByStatus(orders, 'REJECTED'),
-    CANCELLED: countByStatus(orders, 'CANCELLED'),
+    new: countByStatus(orders, 'new'),
+    accepted: countByStatus(orders, 'accepted'),
+    preparing: countByStatus(orders, 'preparing'),
+    delivering: countByStatus(orders, 'delivering'),
+    completed: countByStatus(orders, 'completed'),
+    rejected: countByStatus(orders, 'rejected'),
+    cancelled: countByStatus(orders, 'cancelled'),
   }
 }
 

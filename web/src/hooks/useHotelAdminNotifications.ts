@@ -7,6 +7,7 @@ import {
   requestNotificationPermission,
   showBrowserNotification,
 } from '../lib/notifications'
+import { ChatSenderType, ChatSocketRole } from '../lib/socketEvents'
 
 export type AdminNotificationKind = 'chat' | 'order'
 
@@ -116,7 +117,7 @@ export function useHotelAdminNotifications(hotelId: number) {
         return next
       })
 
-      if (data.message.sender_type !== 'CUSTOMER') return
+      if (data.message.sender_type !== ChatSenderType.Customer) return
       const guestName = data.session.customer_name || `Khách #${data.session.id}`
       const preview =
         data.message.translated_message ?? data.message.original_message ?? 'Tin nhắn mới'
@@ -152,7 +153,7 @@ export function useHotelAdminNotifications(hotelId: number) {
 
   useChatSocket({
     hotelId: hotelId || null,
-    role: 'staff',
+    role: ChatSocketRole.Staff,
     onSessionUpdate: handleSessionUpdate,
     onSessionUnreadUpdate: handleSessionUnreadUpdate,
     onSessionStatusChanged: handleSessionStatusChanged,

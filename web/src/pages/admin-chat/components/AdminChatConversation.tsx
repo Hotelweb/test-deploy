@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { ChatSession } from '../../../api'
+import type { ChatSession, HotelUser } from '../../../api'
 import { CannedResponses } from '../../../components/messages/CannedResponses'
 import { ConnectionBanner, ConnectionDot } from '../../../components/messages/ConnectionBanner'
 import { GuestInfoPanel } from '../../../components/messages/GuestInfoPanel'
@@ -18,11 +18,13 @@ import {
   VideoIcon,
 } from '../../../components/icons/ServiceIcons'
 import { getLanguage } from '../../../lib/languages'
+import { ChatSocketRole } from '../../../lib/socketEvents'
 import { Avatar } from './Avatar'
 import { DateDivider } from './DateDivider'
 
 type AdminChatConversationProps = {
   session: ChatSession
+  staff: HotelUser[]
   connection: ConnectionState
   showOriginal: boolean
   onShowOriginalToggle: () => void
@@ -39,11 +41,14 @@ type AdminChatConversationProps = {
   onAttachClick: () => void
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onRetry: (msg: DisplayMessage) => void
+  onAssignSession: (staffId: number | null) => void
+  onResolveSession: () => void
   onBackToList?: () => void
 }
 
 export function AdminChatConversation({
   session,
+  staff,
   connection,
   showOriginal,
   onShowOriginalToggle,
@@ -60,6 +65,8 @@ export function AdminChatConversation({
   onAttachClick,
   onFileChange,
   onRetry,
+  onAssignSession,
+  onResolveSession,
   onBackToList,
 }: AdminChatConversationProps) {
   const guestName = session.customer_name || `Khách #${session.id}`
@@ -110,6 +117,30 @@ export function AdminChatConversation({
           </div>
 
           <div className="flex items-center gap-1 text-text-muted flex-shrink-0">
+            <select
+              value={session.assigned_user_id ?? ''}
+              onChange={(event) =>
+                onAssignSession(event.target.value ? Number(event.target.value) : null)
+              }
+              className="hidden lg:block h-9 max-w-40 rounded-xl border border-border-light bg-white px-2 text-[12px] text-text-muted"
+              aria-label="Gán hội thoại"
+            >
+              <option value="">Customer Care</option>
+              {staff.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+            {session.status !== 'RESOLVED' && session.status !== 'CLOSED' ? (
+              <button
+                type="button"
+                onClick={onResolveSession}
+                className="hidden sm:flex h-9 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-[12px] font-bold items-center"
+              >
+                Resolve
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onShowOriginalToggle}
@@ -163,7 +194,7 @@ export function AdminChatConversation({
             <MessageBubble
               key={`${msg.id}_${msg.client_message_id ?? ''}`}
               message={msg}
-              viewer="staff"
+              viewer={ChatSocketRole.Staff}
               showOriginal={showOriginal}
               labels={{
                 sending: 'Đang gửi',

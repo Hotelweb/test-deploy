@@ -46,6 +46,7 @@ export function AdminChatPage() {
         {chat.activeSession ? (
           <AdminChatConversation
             session={chat.activeSession}
+            staff={chat.staff}
             connection={chat.connection}
             showOriginal={chat.showOriginal}
             onShowOriginalToggle={() => chat.setShowOriginal((v) => !v)}
@@ -62,6 +63,8 @@ export function AdminChatPage() {
             onAttachClick={chat.handleAttachClick}
             onFileChange={chat.handleFileChange}
             onRetry={chat.handleRetry}
+            onAssignSession={chat.handleAssignSession}
+            onResolveSession={chat.handleResolveSession}
             onBackToList={() => chat.setActiveSession(null)}
           />
         ) : (

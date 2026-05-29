@@ -16,6 +16,7 @@ export interface TokenPayload {
   scope: 'system' | 'hotel';
   email: string;
   hotel_id?: number;
+  role?: string;
   iat: number;
   exp: number;
 }

@@ -9,12 +9,14 @@ import { ChatModule } from '../chat/chat.module.js';
 import { FoodOrderStatsService } from './services/food-order-stats.service.js';
 import { MenuManagementService } from './services/menu-management.service.js';
 import { OrderManagementService } from './services/order-management.service.js';
+import { AuditLogModule } from '../audit-log/audit-log.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([MenuItem, FoodOrder, FoodOrderItem]),
     AuthModule,
     ChatModule,
+    AuditLogModule,
   ],
   controllers: [FoodOrderController],
   providers: [

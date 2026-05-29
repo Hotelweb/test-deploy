@@ -2,14 +2,20 @@ import { useState } from 'react'
 import type { ChatMessage } from '../../api'
 import { cn } from '../../lib/cn'
 import {
+  ChatMessageStatusValue,
+  ChatMessageTypeValue,
+  ChatSenderType,
+  ChatSocketRole,
+  ChatTranslationStatusValue,
+  type ChatSocketRole as Viewer,
+} from '../../lib/socketEvents'
+import {
   AlertIcon,
   CheckDoubleIcon,
   CheckIcon,
   ClockIcon,
   TranslateBubbleIcon,
 } from '../icons/ServiceIcons'
-
-export type Viewer = 'customer' | 'staff'
 
 export interface DisplayMessage extends ChatMessage {
   /** Local-only flag for optimistic updates. */
@@ -66,8 +72,8 @@ export function MessageBubble({
   const [expanded, setExpanded] = useState(showOriginal)
 
   const isMine = isMessageMine(message, viewer)
-  const isSystem = message.message_type === 'SYSTEM'
-  const isImage = message.message_type === 'IMAGE'
+  const isSystem = message.message_type === ChatMessageTypeValue.System
+  const isImage = message.message_type === ChatMessageTypeValue.Image
 
   if (isSystem) {
     return <SystemMessage message={message} />
@@ -77,8 +83,9 @@ export function MessageBubble({
   const primaryText = pickPrimaryText(message, viewer)
   const secondaryText = pickSecondaryText(message, viewer)
   const showSecondary = Boolean(secondaryText && primaryText !== secondaryText)
-  const isTranslating = message.translation_status === 'PENDING' && !message._optimistic
-  const isTranslationFailed = message.translation_status === 'FAILED'
+  const isTranslating =
+    message.translation_status === ChatTranslationStatusValue.Pending && !message._optimistic
+  const isTranslationFailed = message.translation_status === ChatTranslationStatusValue.Failed
   const subtleTextClass = isMine ? 'text-white/75' : 'text-text-light'
   const dotClass = cn(
     'w-1 h-1 rounded-full animate-bounce',
@@ -100,7 +107,7 @@ export function MessageBubble({
           className={cn(
             'relative rounded-2xl px-3.5 py-2.5 shadow-soft',
             isMine
-              ? viewer === 'customer'
+              ? viewer === ChatSocketRole.Customer
                 ? 'gradient-primary text-white rounded-br-md'
                 : 'bg-indigo-600 text-white rounded-br-md'
               : 'bg-white border border-border-light text-text rounded-bl-md',
@@ -198,7 +205,7 @@ export function MessageBubble({
         >
           <span className="text-[10.5px] text-text-lighter">{formatTime(message.created_at)}</span>
 
-          {message.translation_status === 'TRANSLATED' && !isImage ? (
+          {message.translation_status === ChatTranslationStatusValue.Translated && !isImage ? (
             <span className="inline-flex items-center gap-1 text-[10px] text-text-light bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full">
               <TranslateBubbleIcon className="w-2.5 h-2.5" />
               {labels.translatedBadge}
@@ -238,7 +245,7 @@ function MessageStatusBadge({
       </button>
     )
   }
-  if (message._optimistic || message.status === 'SENDING') {
+  if (message._optimistic || message.status === ChatMessageStatusValue.Sending) {
     return (
       <span
         className="flex items-center gap-1 text-[10.5px] text-text-lighter"
@@ -248,7 +255,7 @@ function MessageStatusBadge({
       </span>
     )
   }
-  if (message.status === 'READ' || message.is_read) {
+  if (message.status === ChatMessageStatusValue.Read || message.is_read) {
     return (
       <span
         className="flex items-center gap-0.5 text-[10.5px] text-emerald-600"
@@ -258,7 +265,7 @@ function MessageStatusBadge({
       </span>
     )
   }
-  if (message.status === 'DELIVERED') {
+  if (message.status === ChatMessageStatusValue.Delivered) {
     return (
       <span
         className="flex items-center gap-0.5 text-[10.5px] text-text-lighter"
@@ -293,8 +300,8 @@ function SystemMessage({ message }: { message: ChatMessage }) {
 // ---------------------------------------------------------------------------
 
 function isMessageMine(message: ChatMessage, viewer: Viewer): boolean {
-  if (viewer === 'customer') return message.sender_type === 'CUSTOMER'
-  return message.sender_type === 'STAFF'
+  if (viewer === ChatSocketRole.Customer) return message.sender_type === ChatSenderType.Customer
+  return message.sender_type === ChatSenderType.Staff
 }
 
 /**
@@ -309,11 +316,11 @@ function isMessageMine(message: ChatMessage, viewer: Viewer): boolean {
  *    - their own message: original_message (what they typed in Vietnamese)
  */
 function pickPrimaryText(message: ChatMessage, viewer: Viewer): string {
-  if (viewer === 'customer') {
-    if (message.sender_type === 'CUSTOMER') return message.original_message ?? ''
+  if (viewer === ChatSocketRole.Customer) {
+    if (message.sender_type === ChatSenderType.Customer) return message.original_message ?? ''
     return message.translated_message ?? message.original_message ?? ''
   }
-  if (message.sender_type === 'STAFF') return message.original_message ?? ''
+  if (message.sender_type === ChatSenderType.Staff) return message.original_message ?? ''
   return message.translated_message ?? message.original_message ?? ''
 }
 
@@ -321,9 +328,9 @@ function pickPrimaryText(message: ChatMessage, viewer: Viewer): string {
  * The "show original" secondary text.
  */
 function pickSecondaryText(message: ChatMessage, viewer: Viewer): string | null {
-  if (message.translation_status === 'SKIPPED') return null
-  if (viewer === 'customer') {
-    if (message.sender_type === 'CUSTOMER') return null
+  if (message.translation_status === ChatTranslationStatusValue.Skipped) return null
+  if (viewer === ChatSocketRole.Customer) {
+    if (message.sender_type === ChatSenderType.Customer) return null
     // For staff messages: secondary = the staff's Vietnamese original
     if (message.original_message && message.original_message !== pickPrimaryText(message, viewer)) {
       return message.original_message
@@ -331,7 +338,7 @@ function pickSecondaryText(message: ChatMessage, viewer: Viewer): string | null 
     return null
   }
   // Staff viewer:
-  if (message.sender_type === 'STAFF') return null
+  if (message.sender_type === ChatSenderType.Staff) return null
   // For customer messages: secondary = the original guest text (untranslated)
   if (message.original_message && message.original_message !== pickPrimaryText(message, viewer)) {
     return message.original_message

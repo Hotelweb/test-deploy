@@ -36,6 +36,11 @@ const FoodOrderAdminPage = lazy(() =>
     default: FoodOrderAdminPage,
   })),
 )
+const StaffManagementPage = lazy(() =>
+  import('./pages/StaffManagementPage').then(({ StaffManagementPage }) => ({
+    default: StaffManagementPage,
+  })),
+)
 
 function App() {
   return (
@@ -60,6 +65,7 @@ function App() {
             <Route path="/admin/:hotelId/chat" element={<AdminChatRoute />} />
             <Route path="/admin/:hotelId/services" element={<HotelServicesAdminRoute />} />
             <Route path="/admin/:hotelId/food-order" element={<FoodOrderAdminRoute />} />
+            <Route path="/admin/:hotelId/staff" element={<StaffManagementRoute />} />
           </Routes>
         </Suspense>
       </GuestRouteGuard>
@@ -127,6 +133,16 @@ function FoodOrderAdminRoute() {
   return (
     <RequireAuth scopes={['system', 'hotel']} hotelId={parsed}>
       <FoodOrderAdminPage />
+    </RequireAuth>
+  )
+}
+
+function StaffManagementRoute() {
+  const { hotelId } = useParams<{ hotelId: string }>()
+  const parsed = hotelId ? Number(hotelId) : undefined
+  return (
+    <RequireAuth scopes={['system', 'hotel']} hotelId={parsed}>
+      <StaffManagementPage />
     </RequireAuth>
   )
 }
