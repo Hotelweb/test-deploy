@@ -52,10 +52,28 @@ export interface Hotel {
   logo_url: string | null
   banner_url: string | null
   gallery: string[]
+  theme_config: HotelThemeConfig | null
   qr_token: string
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+export type HotelThemeMode = 'system' | 'light' | 'dark'
+
+export interface HotelThemeColors {
+  primary?: string
+  secondary?: string
+  accent?: string
+  background?: string
+  surface?: string
+  text?: string
+}
+
+export interface HotelThemeConfig {
+  mode?: HotelThemeMode
+  preset?: string
+  colors?: HotelThemeColors
 }
 
 // ---- Hotel admins (per-hotel manager accounts) -------------------------
@@ -305,6 +323,7 @@ export interface UpdateHotelInput {
   logo_url?: string
   banner_url?: string
   gallery?: string[]
+  theme_config?: HotelThemeConfig | null
   is_active?: boolean
 }
 

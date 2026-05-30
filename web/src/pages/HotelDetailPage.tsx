@@ -9,6 +9,7 @@ import { HotelDetailServices } from '../components/services/HotelDetailServices'
 import { HotelGallery } from '../components/HotelGallery'
 import { ServiceDetailModal } from '../components/services/ServiceDetailModal'
 import { TopHeader } from '../components/TopHeader'
+import { applyHotelTheme, resetHotelTheme } from '../lib/theme'
 import heroImage from '../assets/hero.png'
 
 function roundRect(
@@ -53,6 +54,7 @@ export function HotelDetailPage() {
       try {
         setLoading(true)
         const hotelData = await getHotelBySlug(slug!)
+        applyHotelTheme(hotelData.theme_config)
         setHotel(hotelData)
 
         const servicesData = await getHotelServices(hotelData.id, lang === 'VN' ? 'vi' : 'en')
@@ -67,6 +69,12 @@ export function HotelDetailPage() {
 
     loadHotel()
   }, [slug, lang])
+
+  useEffect(() => {
+    if (!hotel) return
+    applyHotelTheme(hotel.theme_config)
+    return () => resetHotelTheme()
+  }, [hotel])
 
   if (loading) {
     return (
@@ -108,6 +116,9 @@ export function HotelDetailPage() {
   }
 
   const hotelPageUrl = `${window.location.origin}/hotel/${hotel.slug}`
+  const primaryColor =
+    getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() ||
+    '#2D5016'
   const downloadQr = () => {
     const svg = qrRef.current
     if (!svg) return
@@ -178,7 +189,7 @@ export function HotelDetailPage() {
       ctx.stroke()
       ctx.drawImage(image, 220, 390, 460, 460)
 
-      ctx.fillStyle = '#2D5016'
+      ctx.fillStyle = primaryColor
       ctx.font = 'bold 28px Arial, sans-serif'
       ctx.fillText(
         lang === 'VN' ? 'Quét mã để xem dịch vụ' : 'Scan to view services',
@@ -229,7 +240,7 @@ export function HotelDetailPage() {
                   size={80}
                   level="M"
                   bgColor="#ffffff"
-                  fgColor="#2D5016"
+                  fgColor={primaryColor}
                 />
                 <button
                   type="button"
@@ -250,7 +261,7 @@ export function HotelDetailPage() {
                 size={88}
                 level="M"
                 bgColor="#ffffff"
-                fgColor="#2D5016"
+                fgColor={primaryColor}
               />
             </div>
             <div className="min-w-0 flex-1">

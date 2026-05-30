@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { getHotel, type Hotel } from '../api'
 import { EditHotelModal } from '../components/EditHotelModal'
+import { HotelThemeCustomizer } from '../components/HotelThemeCustomizer'
 import { UserMenu } from '../components/UserMenu'
 import {
   ArrowRightIcon,
@@ -23,6 +24,7 @@ import type {
   AdminNotificationKind,
 } from '../hooks/useHotelAdminNotifications'
 import { can } from '../lib/permissions'
+import { applyHotelTheme, resetHotelTheme } from '../lib/theme'
 
 export function HotelAdminHomePage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()
@@ -35,6 +37,7 @@ export function HotelAdminHomePage() {
   const [error, setError] = useState<string | null>(null)
   const [editingHotel, setEditingHotel] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [themeOpen, setThemeOpen] = useState(false)
   const notifications = useHotelAdminNotifications(hotelId || 0)
   const internalNotifications = useInternalChatNotifications(hotelId || 0)
 
@@ -44,6 +47,7 @@ export function HotelAdminHomePage() {
     setError(null)
     try {
       const data = await getHotel(hotelId)
+      applyHotelTheme(data.theme_config)
       setHotel(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được thông tin khách sạn')
@@ -61,6 +65,12 @@ export function HotelAdminHomePage() {
       cancelled = true
     }
   }, [loadHotel])
+
+  useEffect(() => {
+    if (!hotel) return
+    applyHotelTheme(hotel.theme_config)
+    return () => resetHotelTheme()
+  }, [hotel])
 
   if (!hotelId) return <Navigate to="/admin" replace />
 
@@ -159,9 +169,24 @@ export function HotelAdminHomePage() {
             </div>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+            {can(auth?.user, 'hotel:manage') ? (
+              <HotelThemeCustomizer
+                hotel={hotel}
+                open={themeOpen}
+                onToggle={() => {
+                  setThemeOpen((prev) => !prev)
+                  setNotificationsOpen(false)
+                }}
+                onClose={() => setThemeOpen(false)}
+                onSaved={(saved) => setHotel(saved)}
+              />
+            ) : null}
             <NotificationBell
               open={notificationsOpen}
-              onToggle={() => setNotificationsOpen((prev) => !prev)}
+              onToggle={() => {
+                setNotificationsOpen((prev) => !prev)
+                setThemeOpen(false)
+              }}
               onClose={() => setNotificationsOpen(false)}
               chatUnread={notifications.chatUnread}
               pendingOrders={notifications.pendingOrders}

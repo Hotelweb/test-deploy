@@ -16,6 +16,7 @@ import {
   ensureGuestNotificationPermission,
   rememberGuestOrder,
 } from '../../hooks/useGuestFaviconNotifications'
+import { applyHotelTheme, resetHotelTheme } from '../../lib/theme'
 
 type CartLine = { item: MenuItem; quantity: number }
 
@@ -46,6 +47,7 @@ export function FoodOrderPage() {
       try {
         setLoading(true)
         const h = await getHotelBySlug(slug!)
+        applyHotelTheme(h.theme_config)
         const items = await getPublicMenu(h.id, apiLang)
         if (!cancelled) {
           setHotel(h)
@@ -65,6 +67,12 @@ export function FoodOrderPage() {
       cancelled = true
     }
   }, [slug, apiLang])
+
+  useEffect(() => {
+    if (!hotel) return
+    applyHotelTheme(hotel.theme_config)
+    return () => resetHotelTheme()
+  }, [hotel])
 
   const filtered = useMemo(() => {
     if (category === 'all') return menu

@@ -166,6 +166,7 @@ async function seed() {
         logo_url TEXT,
         banner_url TEXT,
         gallery TEXT[] NOT NULL DEFAULT '{}',
+        theme_config JSONB,
         qr_token UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -179,6 +180,11 @@ async function seed() {
     await queryRunner.query(`
       ALTER TABLE hotels
         ADD COLUMN IF NOT EXISTS gallery TEXT[] NOT NULL DEFAULT '{}';
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE hotels
+        ADD COLUMN IF NOT EXISTS theme_config JSONB;
     `);
 
     await queryRunner.query(`

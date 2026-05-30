@@ -171,6 +171,7 @@ export class HotelsService {
     if (dto.logo_url !== undefined) hotel.logo_url = dto.logo_url;
     if (dto.banner_url !== undefined) hotel.banner_url = dto.banner_url;
     if (dto.gallery !== undefined) hotel.gallery = dto.gallery;
+    if (dto.theme_config !== undefined) hotel.theme_config = dto.theme_config;
     if (dto.is_active !== undefined) hotel.is_active = dto.is_active;
 
     return this.hotelRepo.save(hotel);

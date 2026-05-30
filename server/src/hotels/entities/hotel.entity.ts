@@ -46,6 +46,9 @@ export class Hotel {
   @Column({ type: 'text', array: true, default: () => "'{}'" })
   gallery: string[];
 
+  @Column({ type: 'jsonb', nullable: true })
+  theme_config: Record<string, unknown> | null;
+
   @Column({ type: 'uuid', unique: true })
   qr_token: string;
 

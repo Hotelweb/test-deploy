@@ -510,6 +510,17 @@ export const SettingsIcon = ({ className = 'w-4 h-4' }: IconProps = {}) => (
   </svg>
 )
 
+// Palette / theme editor
+export const PaletteIcon = ({ className = 'w-4 h-4' }: IconProps = {}) => (
+  <svg viewBox="0 0 24 24" className={className} {...baseProps}>
+    <path d="M12 3a9 9 0 0 0 0 18h1.5a1.8 1.8 0 0 0 1.2-3.15 1.8 1.8 0 0 1 1.2-3.15H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3Z" />
+    <circle cx="7.5" cy="10.5" r=".75" fill="currentColor" />
+    <circle cx="10" cy="7.5" r=".75" fill="currentColor" />
+    <circle cx="14" cy="7.5" r=".75" fill="currentColor" />
+    <circle cx="16.5" cy="10.5" r=".75" fill="currentColor" />
+  </svg>
+)
+
 // Eye (visibility / preview)
 export const EyeIcon = ({ className = 'w-4 h-4' }: IconProps = {}) => (
   <svg viewBox="0 0 24 24" className={className} {...baseProps}>
