@@ -13,9 +13,11 @@ import {
   InRoomDiningIcon,
   ServicesIcon,
   PeopleIcon,
+  UserCircleIcon,
 } from '../components/icons/ServiceIcons'
 import { useAuth } from '../hooks/useAuth'
 import { useHotelAdminNotifications } from '../hooks/useHotelAdminNotifications'
+import { useInternalChatNotifications } from '../hooks/useInternalChatNotifications'
 import type {
   AdminNotificationItem,
   AdminNotificationKind,
@@ -34,6 +36,7 @@ export function HotelAdminHomePage() {
   const [editingHotel, setEditingHotel] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notifications = useHotelAdminNotifications(hotelId || 0)
+  const internalNotifications = useInternalChatNotifications(hotelId || 0)
 
   const loadHotel = useCallback(async () => {
     if (!hotelId) return
@@ -81,6 +84,16 @@ export function HotelAdminHomePage() {
       tone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
       onClick: () => navigate(`/admin/${hotelId}/chat`),
       permission: 'chat:handle' as const,
+      badgeCount: notifications.chatUnread,
+    },
+    {
+      title: 'Chat nội bộ',
+      description: 'Trao đổi trực tiếp giữa quản trị khách sạn và system admin.',
+      buttonLabel: 'Mở chat nội bộ',
+      icon: UserCircleIcon,
+      tone: 'bg-teal-50 text-teal-700 border-teal-100',
+      onClick: () => navigate(`/admin/${hotelId}/internal-chat`),
+      badgeCount: internalNotifications.totalUnread,
     },
     {
       title: 'Quản lý đơn hàng',
@@ -90,6 +103,7 @@ export function HotelAdminHomePage() {
       tone: 'bg-orange-50 text-orange-700 border-orange-100',
       onClick: () => navigate(`/admin/${hotelId}/food-order`),
       permission: 'orders:view' as const,
+      badgeCount: notifications.pendingOrders,
     },
     {
       title: 'Thêm dịch vụ',
@@ -217,8 +231,13 @@ export function HotelAdminHomePage() {
                   type="button"
                   onClick={action.onClick}
                   disabled={action.disabled}
-                  className="glass-card glass-card-hover rounded-2xl p-5 text-left cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                  className="relative glass-card glass-card-hover rounded-2xl p-5 text-left cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                 >
+                  {'badgeCount' in action && action.badgeCount ? (
+                    <span className="absolute right-4 top-4 min-w-6 h-6 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center shadow-soft">
+                      {action.badgeCount > 99 ? '99+' : action.badgeCount}
+                    </span>
+                  ) : null}
                   <span
                     className={`w-12 h-12 rounded-xl border flex items-center justify-center ${action.tone}`}
                   >

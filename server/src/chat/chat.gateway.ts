@@ -18,6 +18,8 @@ import {
 import { TokenService, type TokenPayload } from '../auth/token.service.js';
 import { assertHotelAccess } from '../auth/hotel-access.js';
 import type { FoodOrderView } from '../food-order/food-order.service.js';
+import type { InternalChatMessage } from './entities/internal-chat.entity.js';
+import type { InternalConversationSummary } from './internal-chat.service.js';
 import {
   chatSocketRoom,
   ChatSocketClientEvent,
@@ -140,6 +142,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return {
       event: ChatSocketServerEvent.JoinedOrder,
       data: { orderId: data.orderId },
+    };
+  }
+
+  @SubscribeMessage(ChatSocketClientEvent.JoinSystem)
+  handleJoinSystem(@ConnectedSocket() client: TypedSocket) {
+    const user = this.requireStaff(client);
+    if (user.scope !== 'system') {
+      throw new UnauthorizedException('System admin authentication required');
+    }
+    void client.join(chatSocketRoom.system());
+    return {
+      event: ChatSocketServerEvent.JoinedSystem,
+      data: {},
     };
   }
 
@@ -330,5 +345,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         orderId: order.id,
         order,
       });
+  }
+
+  emitInternalMessage(
+    hotelId: number,
+    data: {
+      conversation: InternalConversationSummary;
+      message: InternalChatMessage;
+    },
+  ) {
+    this.server
+      .to(chatSocketRoom.hotel(hotelId))
+      .emit(ChatSocketServerEvent.InternalMessage, data);
+    this.server
+      .to(chatSocketRoom.system())
+      .emit(ChatSocketServerEvent.InternalMessage, data);
+  }
+
+  emitInternalConversationRead(
+    hotelId: number,
+    conversation: InternalConversationSummary,
+  ) {
+    this.server
+      .to(chatSocketRoom.hotel(hotelId))
+      .emit(ChatSocketServerEvent.InternalConversationRead, { conversation });
+    this.server
+      .to(chatSocketRoom.system())
+      .emit(ChatSocketServerEvent.InternalConversationRead, { conversation });
   }
 }

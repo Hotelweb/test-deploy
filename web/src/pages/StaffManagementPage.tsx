@@ -16,6 +16,7 @@ import {
   ChevronDownIcon,
   MoreIcon,
   PlusIcon,
+  SearchIcon,
 } from '../components/icons/ServiceIcons'
 import { useAuth } from '../hooks/useAuth'
 import type { HotelStaffRole } from '../lib/auth'
@@ -92,6 +93,7 @@ export function StaffManagementPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<StaffFormState>(emptyForm)
+  const [search, setSearch] = useState('')
   const [openActionsUserId, setOpenActionsUserId] = useState<number | null>(null)
 
   const allowed = can(auth?.user, 'users:manage')
@@ -115,6 +117,7 @@ export function StaffManagementPage() {
   }, [load])
 
   const activeCount = useMemo(() => staff.filter((user) => user.is_active).length, [staff])
+  const filteredStaff = useMemo(() => filterStaffByNameOrRole(staff, search), [search, staff])
 
   if (!hotelId) return <Navigate to="/admin" replace />
   if (!allowed) return <AccessDeniedScreen reason="Bạn không có quyền quản lý nhân viên." />
@@ -233,16 +236,28 @@ export function StaffManagementPage() {
         </form>
 
         <section className="rounded-2xl border border-border-light bg-white overflow-visible min-w-0 shadow-soft">
-          <div className="px-4 py-3 border-b border-border-light sm:flex sm:items-center sm:justify-between sm:gap-3">
+          <div className="px-4 py-3 border-b border-border-light flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-[15px] font-bold text-text">Danh sách nhân viên</h2>
               <p className="text-[11.5px] text-text-light mt-0.5">
                 Có thể đổi vai trò, khóa/mở tài khoản và đặt lại mật khẩu tạm.
               </p>
             </div>
-            <span className="mt-2 sm:mt-0 inline-flex h-8 items-center rounded-full bg-primary/8 px-3 text-[12px] font-bold text-primary">
-              {staff.length} nhân viên
-            </span>
+            <div className="flex flex-col gap-2 sm:w-80">
+              <div className="relative">
+                <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-lighter pointer-events-none" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Tìm theo tên hoặc role"
+                  className="h-10 w-full rounded-xl border border-border-light bg-white pl-9 pr-3 text-[13px] text-text outline-none transition-colors placeholder:text-text-lighter focus:border-primary/35 focus:ring-2 focus:ring-primary/15"
+                />
+              </div>
+              <span className="inline-flex h-7 w-fit items-center rounded-full bg-primary/8 px-3 text-[12px] font-bold text-primary">
+                {filteredStaff.length}/{staff.length} nhân viên
+              </span>
+            </div>
           </div>
 
           {loading ? (
@@ -251,9 +266,13 @@ export function StaffManagementPage() {
             </div>
           ) : staff.length === 0 ? (
             <p className="p-6 text-sm text-text-light">Chưa có nhân viên.</p>
+          ) : filteredStaff.length === 0 ? (
+            <p className="p-6 text-sm text-text-light">
+              Không tìm thấy nhân viên theo tên hoặc role đã nhập.
+            </p>
           ) : (
             <ul role="list" className="divide-y divide-border-light">
-              {staff.map((user) => (
+              {filteredStaff.map((user) => (
                 <li
                   key={user.id}
                   className="p-4 transition-colors duration-200 hover:bg-background/70"
@@ -314,6 +333,24 @@ export function StaffManagementPage() {
       </main>
     </div>
   )
+}
+
+function filterStaffByNameOrRole(staff: HotelUser[], query: string) {
+  const q = query.trim().toLowerCase()
+  if (!q) return staff
+  return staff.filter((user) => {
+    const roles = normalizeRoles(user.roles, user.role)
+    const haystack = [
+      user.full_name,
+      user.email,
+      ...roles,
+      ...roles.map((role) => roleLabel(role)),
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    return haystack.includes(q)
+  })
 }
 
 function StaffActionsMenu({

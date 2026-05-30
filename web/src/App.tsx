@@ -41,6 +41,11 @@ const StaffManagementPage = lazy(() =>
     default: StaffManagementPage,
   })),
 )
+const InternalChatPage = lazy(() =>
+  import('./pages/InternalChatPage').then(({ InternalChatPage }) => ({
+    default: InternalChatPage,
+  })),
+)
 const NotFoundPage = lazy(() =>
   import('./pages/NotFoundPage').then(({ NotFoundPage }) => ({ default: NotFoundPage })),
 )
@@ -69,6 +74,7 @@ function App() {
             <Route path="/admin/:hotelId/services" element={<HotelServicesAdminRoute />} />
             <Route path="/admin/:hotelId/food-order" element={<FoodOrderAdminRoute />} />
             <Route path="/admin/:hotelId/staff" element={<StaffManagementRoute />} />
+            <Route path="/admin/:hotelId/internal-chat" element={<InternalChatRoute />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
@@ -147,6 +153,16 @@ function StaffManagementRoute() {
   return (
     <RequireAuth scopes={['system', 'hotel']} hotelId={parsed}>
       <StaffManagementPage />
+    </RequireAuth>
+  )
+}
+
+function InternalChatRoute() {
+  const { hotelId } = useParams<{ hotelId: string }>()
+  const parsed = hotelId ? Number(hotelId) : undefined
+  return (
+    <RequireAuth scopes={['system', 'hotel']} hotelId={parsed}>
+      <InternalChatPage />
     </RequireAuth>
   )
 }

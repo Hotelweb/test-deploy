@@ -3,6 +3,7 @@ export const ChatSocketClientEvent = {
   LeaveSession: 'leaveSession',
   JoinHotel: 'joinHotel',
   JoinOrder: 'joinOrder',
+  JoinSystem: 'joinSystem',
   SendMessage: 'sendMessage',
   Typing: 'typing',
   MarkRead: 'markRead',
@@ -18,6 +19,8 @@ export const ChatSocketServerEvent = {
   SessionStatusChanged: 'sessionStatusChanged',
   OrderCreated: 'orderCreated',
   OrderStatusChanged: 'orderStatusChanged',
+  InternalMessage: 'internalMessage',
+  InternalConversationRead: 'internalConversationRead',
 } as const
 
 export const ChatSocketRole = {

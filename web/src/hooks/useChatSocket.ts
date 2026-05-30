@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { API_BASE } from '../api'
 import type { ChatMessage, ChatSession, MessageType } from '../api'
-import type { FoodOrder } from '../api'
+import type { FoodOrder, InternalChatConversation, InternalChatMessage } from '../api'
 import { getToken } from '../lib/auth'
 import {
   ChatReadActor,
@@ -21,6 +21,8 @@ export interface UseChatSocketOptions {
   sessionId?: number | null
   /** Hotel id to subscribe to (admin dashboard mode). */
   hotelId?: number | null
+  /** Subscribe to system-admin wide events. */
+  joinSystem?: boolean
   /** Role identifier passed when joining the session room. */
   role?: ChatSocketRoleValue
   /** Optional callbacks. */
@@ -36,6 +38,11 @@ export interface UseChatSocketOptions {
   onSessionStatusChanged?: (data: { sessionId: number; session: ChatSession }) => void
   onOrderCreated?: (data: { orderId: number; order: FoodOrder }) => void
   onOrderStatusChanged?: (data: { orderId: number; order: FoodOrder }) => void
+  onInternalMessage?: (data: {
+    conversation: InternalChatConversation
+    message: InternalChatMessage
+  }) => void
+  onInternalConversationRead?: (data: { conversation: InternalChatConversation }) => void
 }
 
 export interface UseChatSocketResult {
@@ -68,6 +75,7 @@ export function useChatSocket(options: UseChatSocketOptions): UseChatSocketResul
   const {
     sessionId,
     hotelId,
+    joinSystem,
     role,
     onNewMessage,
     onTyping,
@@ -77,6 +85,8 @@ export function useChatSocket(options: UseChatSocketOptions): UseChatSocketResul
     onSessionStatusChanged,
     onOrderCreated,
     onOrderStatusChanged,
+    onInternalMessage,
+    onInternalConversationRead,
   } = options
 
   const [connection, setConnection] = useState<ConnectionState>('connecting')
@@ -94,6 +104,8 @@ export function useChatSocket(options: UseChatSocketOptions): UseChatSocketResul
     onSessionStatusChanged,
     onOrderCreated,
     onOrderStatusChanged,
+    onInternalMessage,
+    onInternalConversationRead,
   })
   useEffect(() => {
     cbRef.current = {
@@ -105,6 +117,8 @@ export function useChatSocket(options: UseChatSocketOptions): UseChatSocketResul
       onSessionStatusChanged,
       onOrderCreated,
       onOrderStatusChanged,
+      onInternalMessage,
+      onInternalConversationRead,
     }
   }, [
     onNewMessage,
@@ -115,6 +129,8 @@ export function useChatSocket(options: UseChatSocketOptions): UseChatSocketResul
     onSessionStatusChanged,
     onOrderCreated,
     onOrderStatusChanged,
+    onInternalMessage,
+    onInternalConversationRead,
   ])
 
   useEffect(() => {
@@ -132,6 +148,7 @@ export function useChatSocket(options: UseChatSocketOptions): UseChatSocketResul
     const joinRooms = () => {
       if (sessionId) socket.emit(ChatSocketClientEvent.JoinSession, { sessionId, role })
       if (hotelId) socket.emit(ChatSocketClientEvent.JoinHotel, { hotelId })
+      if (joinSystem) socket.emit(ChatSocketClientEvent.JoinSystem)
     }
 
     socket.on('connect', () => {
@@ -162,13 +179,19 @@ export function useChatSocket(options: UseChatSocketOptions): UseChatSocketResul
     socket.on(ChatSocketServerEvent.OrderStatusChanged, (data) =>
       cbRef.current.onOrderStatusChanged?.(data),
     )
+    socket.on(ChatSocketServerEvent.InternalMessage, (data) =>
+      cbRef.current.onInternalMessage?.(data),
+    )
+    socket.on(ChatSocketServerEvent.InternalConversationRead, (data) =>
+      cbRef.current.onInternalConversationRead?.(data),
+    )
 
     return () => {
       socket.removeAllListeners()
       socket.disconnect()
       socketRef.current = null
     }
-  }, [sessionId, hotelId, role])
+  }, [sessionId, hotelId, joinSystem, role])
 
   const sendMessage = useCallback((payload: SendMessagePayload) => {
     socketRef.current?.emit(ChatSocketClientEvent.SendMessage, payload)

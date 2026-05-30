@@ -226,6 +226,43 @@ export interface ChatMessage {
   created_at: string
 }
 
+export type InternalMessageSenderScope = 'system' | 'hotel'
+
+export interface InternalChatConversation {
+  id: number
+  hotel_id: number
+  conversation_type: 'SYSTEM_HOTEL' | 'HOTEL_STAFF'
+  participant_a_user_id: number | null
+  participant_b_user_id: number | null
+  participant_a_user?: HotelUser | null
+  participant_b_user?: HotelUser | null
+  unread_system_count: number
+  unread_hotel_count: number
+  unread_participant_a_count: number
+  unread_participant_b_count: number
+  unread_count: number
+  last_message_preview: string | null
+  last_message_at: string | null
+  created_at: string
+  updated_at: string
+  hotel?: Hotel
+}
+
+export interface InternalChatMessage {
+  id: number
+  conversation_id: number
+  hotel_id: number
+  sender_scope: InternalMessageSenderScope
+  sender_user_id: number
+  sender_email: string
+  message: string
+  is_read_by_system: boolean
+  is_read_by_hotel: boolean
+  read_by_system_at: string | null
+  read_by_hotel_at: string | null
+  created_at: string
+}
+
 export interface CreateSessionInput {
   hotel_id: number
   customer_language: string
@@ -697,6 +734,58 @@ export const translateText = (text: string, source: string, target: string) =>
     method: 'POST',
     body: JSON.stringify({ text, source, target }),
   })
+
+// Internal chat APIs
+export const getInternalConversations = (hotelId?: number) =>
+  fetchApi<InternalChatConversation[]>(
+    `/internal-chat/conversations${hotelId ? `?hotel_id=${hotelId}` : ''}`,
+  )
+
+export const getInternalMessages = (hotelId: number) =>
+  fetchApi<InternalChatMessage[]>(`/internal-chat/hotels/${hotelId}/messages`)
+
+export const sendInternalMessage = (hotelId: number, message: string) =>
+  fetchApi<{
+    conversation: InternalChatConversation
+    message: InternalChatMessage
+  }>(`/internal-chat/hotels/${hotelId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  })
+
+export const markInternalConversationRead = (hotelId: number) =>
+  fetchApi<InternalChatConversation>(`/internal-chat/hotels/${hotelId}/read`, {
+    method: 'POST',
+  })
+
+export const getStaffInternalConversations = (hotelId: number) =>
+  fetchApi<InternalChatConversation[]>(
+    `/internal-chat/hotels/${hotelId}/staff-conversations`,
+  )
+
+export const getStaffInternalMessages = (hotelId: number, peerUserId: number) =>
+  fetchApi<InternalChatMessage[]>(
+    `/internal-chat/hotels/${hotelId}/staff/${peerUserId}/messages`,
+  )
+
+export const sendStaffInternalMessage = (
+  hotelId: number,
+  peerUserId: number,
+  message: string,
+) =>
+  fetchApi<{
+    conversation: InternalChatConversation
+    message: InternalChatMessage
+  }>(`/internal-chat/hotels/${hotelId}/staff/${peerUserId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  })
+
+export const markStaffInternalConversationRead = (hotelId: number, peerUserId: number) =>
+  fetchApi<InternalChatConversation>(
+    `/internal-chat/hotels/${hotelId}/staff/${peerUserId}/read`,
+    { method: 'POST' },
+  )
 
 // ---- Auth ----------------------------------------------------------------
 

@@ -3,6 +3,7 @@ export enum ChatSocketClientEvent {
   LeaveSession = 'leaveSession',
   JoinHotel = 'joinHotel',
   JoinOrder = 'joinOrder',
+  JoinSystem = 'joinSystem',
   SendMessage = 'sendMessage',
   Typing = 'typing',
   MarkRead = 'markRead',
@@ -14,6 +15,7 @@ export enum ChatSocketServerEvent {
   LeftSession = 'leftSession',
   JoinedHotel = 'joinedHotel',
   JoinedOrder = 'joinedOrder',
+  JoinedSystem = 'joinedSystem',
   NewMessage = 'newMessage',
   MessageSent = 'messageSent',
   Typing = 'typing',
@@ -24,12 +26,15 @@ export enum ChatSocketServerEvent {
   SessionStatusChanged = 'sessionStatusChanged',
   OrderCreated = 'orderCreated',
   OrderStatusChanged = 'orderStatusChanged',
+  InternalMessage = 'internalMessage',
+  InternalConversationRead = 'internalConversationRead',
 }
 
 export enum ChatSocketRoomPrefix {
   Session = 'session',
   Hotel = 'hotel',
   Order = 'order',
+  System = 'system',
 }
 
 export enum ChatSocketRole {
@@ -47,4 +52,5 @@ export const chatSocketRoom = {
     `${ChatSocketRoomPrefix.Session}_${sessionId}`,
   hotel: (hotelId: number) => `${ChatSocketRoomPrefix.Hotel}_${hotelId}`,
   order: (orderId: number) => `${ChatSocketRoomPrefix.Order}_${orderId}`,
+  system: () => `${ChatSocketRoomPrefix.System}_admins`,
 } as const;
