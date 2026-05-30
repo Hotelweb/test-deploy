@@ -28,7 +28,7 @@ import { TypingIndicator } from './TypingIndicator'
 import { ConnectionBanner, ConnectionDot } from './ConnectionBanner'
 import { QuickReplies } from './QuickReplies'
 import { SkeletonList } from './SkeletonMessage'
-import { CloseIcon, ImageIcon, SendIcon, SmileIcon, SparkleIcon } from '../icons/ServiceIcons'
+import { CloseIcon, ImageIcon, SendIcon, SparkleIcon } from '../icons/ServiceIcons'
 
 interface ChatWindowProps {
   hotelId: number
@@ -532,15 +532,8 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
                     }}
                     rows={1}
                     placeholder={t(lang, 'chat.input_placeholder')}
-                    className="block w-full h-11 max-h-[120px] resize-none px-4 py-3 rounded-2xl bg-gray-100 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white border border-transparent focus:border-primary/30 transition-all placeholder:text-text-lighter pr-10 overflow-y-auto"
+                    className="block w-full h-11 max-h-[120px] resize-none px-4 py-3 rounded-2xl bg-gray-100 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white border border-transparent focus:border-primary/30 transition-all placeholder:text-text-lighter overflow-y-auto"
                   />
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center text-text-muted cursor-pointer transition-colors"
-                    aria-label="Add emoji"
-                  >
-                    <SmileIcon className="w-4 h-4" />
-                  </button>
                 </div>
                 <button
                   type="button"

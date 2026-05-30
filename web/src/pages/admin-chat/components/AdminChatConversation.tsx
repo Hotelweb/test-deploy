@@ -9,13 +9,9 @@ import { TypingIndicator } from '../../../components/messages/TypingIndicator'
 import type { ConnectionState } from '../../../hooks/useChatSocket'
 import {
   ImageIcon,
-  MoreIcon,
   PaperclipIcon,
-  PhoneIcon,
   SendIcon,
-  SmileIcon,
   TranslateBubbleIcon,
-  VideoIcon,
 } from '../../../components/icons/ServiceIcons'
 import { getLanguage } from '../../../lib/languages'
 import { ChatSocketRole } from '../../../lib/socketEvents'
@@ -156,24 +152,6 @@ export function AdminChatConversation({
                 {showOriginal ? 'Ẩn bản gốc' : 'Xem bản gốc'}
               </span>
             </button>
-            <button
-              className="hidden sm:flex w-9 h-9 rounded-xl hover:bg-gray-100 items-center justify-center cursor-pointer"
-              aria-label="Gọi điện"
-            >
-              <PhoneIcon className="w-4 h-4" />
-            </button>
-            <button
-              className="hidden sm:flex w-9 h-9 rounded-xl hover:bg-gray-100 items-center justify-center cursor-pointer"
-              aria-label="Gọi video"
-            >
-              <VideoIcon className="w-4 h-4" />
-            </button>
-            <button
-              className="hidden sm:flex w-9 h-9 rounded-xl hover:bg-gray-100 items-center justify-center cursor-pointer"
-              aria-label="Tùy chọn"
-            >
-              <MoreIcon className="w-4 h-4" />
-            </button>
           </div>
         </header>
 
@@ -263,15 +241,8 @@ export function AdminChatConversation({
                 onKeyDown={onKeyDown}
                 rows={1}
                 placeholder={`Nhập tin nhắn (sẽ tự dịch sang ${customerLang.nativeName})…`}
-                className="block w-full h-11 max-h-[140px] resize-none px-4 py-3 rounded-2xl bg-gray-50 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:bg-white border border-border-light focus:border-indigo-300 transition-all placeholder:text-text-lighter pr-10 overflow-y-auto"
+                className="block w-full h-11 max-h-[140px] resize-none px-4 py-3 rounded-2xl bg-gray-50 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:bg-white border border-border-light focus:border-indigo-300 transition-all placeholder:text-text-lighter overflow-y-auto"
               />
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center text-text-muted cursor-pointer transition-colors"
-                aria-label="Thêm emoji"
-              >
-                <SmileIcon className="w-4 h-4" />
-              </button>
             </div>
             <button
               type="button"

@@ -5,6 +5,7 @@ import { HotelStaffRole } from '../hotel-users/entities/hotel-user.entity.js';
 export type StaffPermission =
   | 'orders:view'
   | 'orders:update'
+  | 'hotel:manage'
   | 'services:manage'
   | 'chat:handle'
   | 'reports:view'
@@ -14,6 +15,7 @@ const ROLE_PERMISSIONS: Record<HotelStaffRole, StaffPermission[]> = {
   [HotelStaffRole.HOTEL_ADMIN]: [
     'orders:view',
     'orders:update',
+    'hotel:manage',
     'services:manage',
     'chat:handle',
     'reports:view',
@@ -22,6 +24,7 @@ const ROLE_PERMISSIONS: Record<HotelStaffRole, StaffPermission[]> = {
   [HotelStaffRole.MANAGER]: [
     'orders:view',
     'orders:update',
+    'hotel:manage',
     'services:manage',
     'chat:handle',
     'reports:view',
@@ -39,8 +42,8 @@ export function hasPermission(
   permission: StaffPermission,
 ): boolean {
   if (user.scope === 'system') return true;
-  const role = (user.role as HotelStaffRole | undefined) ?? HotelStaffRole.HOTEL_ADMIN;
-  return Boolean(role && ROLE_PERMISSIONS[role]?.includes(permission));
+  const roles = getRolesFromToken(user);
+  return roles.some((role) => ROLE_PERMISSIONS[role]?.includes(permission));
 }
 
 export function assertPermission(
@@ -54,4 +57,11 @@ export function assertPermission(
 
 export function getPermissionsForRole(role: HotelStaffRole): StaffPermission[] {
   return ROLE_PERMISSIONS[role] ?? [];
+}
+
+function getRolesFromToken(user: TokenPayload): HotelStaffRole[] {
+  const roles = user.roles?.length ? user.roles : user.role ? [user.role] : [];
+  return roles.filter((role): role is HotelStaffRole =>
+    Object.values(HotelStaffRole).includes(role as HotelStaffRole),
+  );
 }

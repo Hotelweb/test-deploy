@@ -41,6 +41,9 @@ const StaffManagementPage = lazy(() =>
     default: StaffManagementPage,
   })),
 )
+const NotFoundPage = lazy(() =>
+  import('./pages/NotFoundPage').then(({ NotFoundPage }) => ({ default: NotFoundPage })),
+)
 
 function App() {
   return (
@@ -66,6 +69,7 @@ function App() {
             <Route path="/admin/:hotelId/services" element={<HotelServicesAdminRoute />} />
             <Route path="/admin/:hotelId/food-order" element={<FoodOrderAdminRoute />} />
             <Route path="/admin/:hotelId/staff" element={<StaffManagementRoute />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </GuestRouteGuard>

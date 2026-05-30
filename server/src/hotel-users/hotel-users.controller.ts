@@ -60,7 +60,10 @@ export class HotelUsersController {
     status: 409,
     description: 'Email already exists for this hotel',
   })
-  async create(@Body() dto: CreateHotelUserDto, @CurrentUser() user: TokenPayload) {
+  async create(
+    @Body() dto: CreateHotelUserDto,
+    @CurrentUser() user: TokenPayload,
+  ) {
     assertHotelAccess(user, dto.hotel_id);
     assertPermission(user, 'users:manage');
     const created = await this.hotelUsersService.create(dto);
@@ -70,7 +73,7 @@ export class HotelUsersController {
       action: 'user.created',
       targetType: 'hotel_user',
       targetId: Number(created.id),
-      metadata: { role: dto.role },
+      metadata: { role: dto.role, roles: dto.roles },
     });
     return created;
   }
@@ -131,15 +134,24 @@ export class HotelUsersController {
     assertHotelAccess(user, Number(target.hotel_id));
     assertPermission(user, 'users:manage');
     const updated = await this.hotelUsersService.update(id, dto);
-    if (dto.role !== undefined || dto.is_active !== undefined || dto.password) {
+    if (
+      dto.role !== undefined ||
+      dto.roles !== undefined ||
+      dto.is_active !== undefined ||
+      dto.password
+    ) {
       void this.auditLog.record({
         actor: user,
         hotelId: Number(target.hotel_id),
-        action: dto.role !== undefined ? 'user.role_updated' : 'user.updated',
+        action:
+          dto.role !== undefined || dto.roles !== undefined
+            ? 'user.role_updated'
+            : 'user.updated',
         targetType: 'hotel_user',
         targetId: id,
         metadata: {
           role: dto.role,
+          roles: dto.roles,
           is_active: dto.is_active,
           password_reset: Boolean(dto.password),
         },

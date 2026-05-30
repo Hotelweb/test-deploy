@@ -27,7 +27,7 @@ import {
 } from '../../../lib/socketEvents'
 import { ADMIN_LANG, FILTERS, STAFF_USER_ID, type FilterKey } from '../consts'
 
-export function useAdminChat(hotelId: number) {
+export function useAdminChat(hotelId: number, enabled = true) {
   const [hotel, setHotel] = useState<Hotel | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [staff, setStaff] = useState<HotelUser[]>([])
@@ -36,7 +36,7 @@ export function useAdminChat(hotelId: number) {
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
@@ -53,7 +53,10 @@ export function useAdminChat(hotelId: number) {
   }, [activeSession?.id])
 
   useEffect(() => {
-    if (!hotelId) return
+    if (!hotelId || !enabled) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
 
     const load = async () => {
@@ -78,7 +81,7 @@ export function useAdminChat(hotelId: number) {
     return () => {
       cancelled = true
     }
-  }, [hotelId])
+  }, [enabled, hotelId])
 
   useEffect(() => {
     if (typeof Notification === 'undefined') return
@@ -188,7 +191,7 @@ export function useAdminChat(hotelId: number) {
     markRead,
   } = useChatSocket({
     sessionId: activeSession?.id ?? null,
-    hotelId,
+    hotelId: enabled ? hotelId : null,
     role: ChatSocketRole.Staff,
     onNewMessage: handleNewMessage,
     onTyping: handleTyping,

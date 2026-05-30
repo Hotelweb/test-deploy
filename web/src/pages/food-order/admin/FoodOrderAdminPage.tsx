@@ -1,4 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
+import { AccessDeniedScreen } from '../../../components/RequireAuth'
+import { useAuth } from '../../../hooks/useAuth'
+import { can } from '../../../lib/permissions'
 import { FoodOrderAdminHeader } from './components/FoodOrderAdminHeader'
 import { MenuItemModal } from './components/MenuItemModal'
 import { MenuPanel } from './components/MenuPanel'
@@ -11,7 +14,11 @@ export function FoodOrderAdminPage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()
   const hotelId = Number(hotelIdParam)
   const navigate = useNavigate()
-  const admin = useFoodOrderAdmin(hotelId)
+  const auth = useAuth()
+  const allowed = can(auth?.user, 'orders:view')
+  const admin = useFoodOrderAdmin(hotelId, allowed)
+
+  if (!allowed) return <AccessDeniedScreen reason="Bạn không có quyền xem đơn hàng." />
 
   if (admin.loading) {
     return (
@@ -29,7 +36,7 @@ export function FoodOrderAdminPage() {
         onBack={() => navigate(`/admin/${hotelId}`)}
       />
 
-      <main className="px-4 sm:px-8 py-6 max-w-6xl mx-auto">
+      <main className="px-4 sm:px-8 lg:px-12 py-6 max-w-[88rem] mx-auto">
         <TabsNav activeTab={admin.tab} pendingCount={admin.pendingCount} onChange={admin.setTab} />
 
         {admin.tab === 'stats' && admin.stats ? (

@@ -14,7 +14,7 @@ export function FoodOrderAdminHeader({
 }: FoodOrderAdminHeaderProps) {
   return (
     <header className="glass-nav sticky top-0 z-30 px-4 sm:px-8 py-5">
-      <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="max-w-[88rem] mx-auto flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBack}

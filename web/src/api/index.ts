@@ -67,6 +67,7 @@ export interface HotelUser {
   full_name: string
   avatar_url: string | null
   role: HotelStaffRole
+  roles?: HotelStaffRole[] | null
   is_active: boolean
   last_login_at: string | null
   created_at: string
@@ -80,6 +81,7 @@ export interface CreateHotelUserInput {
   full_name: string
   avatar_url?: string
   role?: HotelStaffRole
+  roles?: HotelStaffRole[]
 }
 
 export interface CreateHotelInput {
@@ -342,6 +344,7 @@ export interface UpdateHotelUserInput {
   avatar_url?: string
   is_active?: boolean
   role?: HotelStaffRole
+  roles?: HotelStaffRole[]
 }
 
 export const updateHotelUser = (id: number, data: UpdateHotelUserInput) =>
@@ -712,6 +715,7 @@ export interface LoginResponse {
     scope: 'system' | 'hotel'
     hotel_id?: number
     role?: HotelStaffRole
+    roles?: HotelStaffRole[]
     avatar_url?: string | null
     is_active: boolean
     last_login_at?: string | null

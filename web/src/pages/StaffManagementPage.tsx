@@ -9,10 +9,12 @@ import {
   type HotelUser,
 } from '../api'
 import { UserMenu } from '../components/UserMenu'
+import { AccessDeniedScreen } from '../components/RequireAuth'
 import {
   ArrowLeftIcon,
   CheckIcon,
   ChevronDownIcon,
+  MoreIcon,
   PlusIcon,
 } from '../components/icons/ServiceIcons'
 import { useAuth } from '../hooks/useAuth'
@@ -51,18 +53,33 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
+function normalizeRoles(
+  roles?: HotelStaffRole[] | null,
+  fallback?: HotelStaffRole,
+): HotelStaffRole[] {
+  const unique = Array.from(
+    new Set((roles?.length ? roles : fallback ? [fallback] : []).filter(Boolean)),
+  )
+  return unique.length > 0 ? unique : ['reception']
+}
+
+function roleSummary(roles: HotelStaffRole[]) {
+  if (roles.length === 1) return roleLabel(roles[0])
+  return `${roles.length} vai trò`
+}
+
 type StaffFormState = {
   full_name: string
   email: string
   password: string
-  role: HotelStaffRole
+  roles: HotelStaffRole[]
 }
 
 const emptyForm: StaffFormState = {
   full_name: '',
   email: '',
   password: '',
-  role: 'reception',
+  roles: ['reception'],
 }
 
 export function StaffManagementPage() {
@@ -75,6 +92,7 @@ export function StaffManagementPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<StaffFormState>(emptyForm)
+  const [openActionsUserId, setOpenActionsUserId] = useState<number | null>(null)
 
   const allowed = can(auth?.user, 'users:manage')
 
@@ -99,7 +117,7 @@ export function StaffManagementPage() {
   const activeCount = useMemo(() => staff.filter((user) => user.is_active).length, [staff])
 
   if (!hotelId) return <Navigate to="/admin" replace />
-  if (!allowed) return <Navigate to={`/admin/${hotelId}`} replace />
+  if (!allowed) return <AccessDeniedScreen reason="Bạn không có quyền quản lý nhân viên." />
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -111,7 +129,8 @@ export function StaffManagementPage() {
         email: form.email.trim(),
         full_name: form.full_name.trim(),
         password: form.password,
-        role: form.role,
+        role: form.roles[0],
+        roles: form.roles,
       })
       setStaff((prev) => [created, ...prev])
       setForm(emptyForm)
@@ -134,7 +153,7 @@ export function StaffManagementPage() {
   return (
     <div className="min-h-screen bg-background-warm">
       <header className="sticky top-0 z-30 border-b border-border-light bg-white/92 backdrop-blur px-4 sm:px-8 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+        <div className="max-w-[88rem] mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -155,7 +174,7 @@ export function StaffManagementPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-5">
+      <main className="max-w-[88rem] mx-auto px-4 sm:px-8 lg:px-12 py-6 grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-5">
         <form
           onSubmit={handleCreate}
           className="rounded-2xl border border-border-light bg-white p-4 sm:p-5 h-fit shadow-soft"
@@ -199,8 +218,8 @@ export function StaffManagementPage() {
           <RoleSelect
             id="new-staff-role"
             label="Vai trò"
-            value={form.role}
-            onChange={(role) => setForm((prev) => ({ ...prev, role }))}
+            value={form.roles}
+            onChange={(roles) => setForm((prev) => ({ ...prev, roles }))}
             className="mt-3"
           />
 
@@ -239,7 +258,7 @@ export function StaffManagementPage() {
                   key={user.id}
                   className="p-4 transition-colors duration-200 hover:bg-background/70"
                 >
-                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,21rem)_minmax(15rem,18rem)] xl:items-center">
+                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,21rem)_3rem] xl:items-center">
                     <div className="flex min-w-0 items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-[12px] font-extrabold text-primary">
                         {getInitials(user.full_name) || 'NV'}
@@ -271,34 +290,21 @@ export function StaffManagementPage() {
 
                     <RoleSelect
                       id={`staff-role-${user.id}`}
-                      value={user.role}
-                      onChange={(role) => void patchStaff(user, { role })}
+                      value={normalizeRoles(user.roles, user.role)}
+                      onChange={(roles) => void patchStaff(user, { role: roles[0], roles })}
                       compact
                     />
 
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                      <button
-                        type="button"
-                        onClick={() => void patchStaff(user, { is_active: !user.is_active })}
-                        className={`h-10 w-full rounded-xl px-3 text-[13px] font-bold whitespace-nowrap cursor-pointer transition-colors duration-200 ${
-                          user.is_active
-                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                            : 'bg-gray-100 text-text-muted hover:bg-gray-200'
-                        }`}
-                      >
-                        {user.is_active ? 'Khóa tài khoản' : 'Mở tài khoản'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const password = window.prompt('Mật khẩu tạm mới (tối thiểu 6 ký tự):')
-                          if (password && password.length >= 6) void patchStaff(user, { password })
-                        }}
-                        className="h-10 w-full rounded-xl border border-border-light bg-white px-3 text-[13px] font-bold text-text-muted whitespace-nowrap cursor-pointer transition-colors duration-200 hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
-                      >
-                        Reset mật khẩu
-                      </button>
-                    </div>
+                    <StaffActionsMenu
+                      user={user}
+                      open={openActionsUserId === user.id}
+                      onOpenChange={(open) => setOpenActionsUserId(open ? user.id : null)}
+                      onToggleActive={() => void patchStaff(user, { is_active: !user.is_active })}
+                      onResetPassword={() => {
+                        const password = window.prompt('Mật khẩu tạm mới (tối thiểu 6 ký tự):')
+                        if (password && password.length >= 6) void patchStaff(user, { password })
+                      }}
+                    />
                   </div>
                 </li>
               ))}
@@ -306,6 +312,74 @@ export function StaffManagementPage() {
           )}
         </section>
       </main>
+    </div>
+  )
+}
+
+function StaffActionsMenu({
+  user,
+  open,
+  onOpenChange,
+  onToggleActive,
+  onResetPassword,
+}: {
+  user: HotelUser
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onToggleActive: () => void
+  onResetPassword: () => void
+}) {
+  return (
+    <div
+      className="relative flex justify-start xl:justify-end"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) onOpenChange(false)
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-light bg-white text-text-muted hover:border-primary/30 hover:bg-primary/5 hover:text-primary cursor-pointer transition-colors"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Mở hành động cho ${user.full_name}`}
+      >
+        <MoreIcon className="h-4 w-4" />
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute left-0 top-11 z-50 w-48 overflow-hidden rounded-2xl border border-border-light bg-white shadow-elevated xl:left-auto xl:right-0"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onOpenChange(false)
+              onToggleActive()
+            }}
+            className={`flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[13px] font-semibold cursor-pointer transition-colors ${
+              user.is_active
+                ? 'text-emerald-700 hover:bg-emerald-50'
+                : 'text-text-muted hover:bg-gray-50'
+            }`}
+          >
+            {user.is_active ? 'Khóa tài khoản' : 'Mở tài khoản'}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onOpenChange(false)
+              onResetPassword()
+            }}
+            className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[13px] font-semibold text-text-muted hover:bg-primary/5 hover:text-primary cursor-pointer transition-colors"
+          >
+            Reset mật khẩu
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -320,13 +394,23 @@ function RoleSelect({
 }: {
   id: string
   label?: string
-  value: HotelStaffRole
-  onChange: (role: HotelStaffRole) => void
+  value: HotelStaffRole[]
+  onChange: (roles: HotelStaffRole[]) => void
   compact?: boolean
   className?: string
 }) {
   const [open, setOpen] = useState(false)
-  const selectedLabel = roleLabel(value)
+  const selectedRoles = normalizeRoles(value)
+  const selectedLabel = roleSummary(selectedRoles)
+  const selectedDescriptions = selectedRoles.map((role) => ROLE_HELPER[role]).join(' · ')
+
+  const toggleRole = (role: HotelStaffRole) => {
+    const next = selectedRoles.includes(role)
+      ? selectedRoles.filter((item) => item !== role)
+      : [...selectedRoles, role]
+
+    onChange(next.length > 0 ? next : selectedRoles)
+  }
 
   return (
     <div
@@ -355,7 +439,7 @@ function RoleSelect({
           <span className="block truncate font-bold">{selectedLabel}</span>
           {!compact ? (
             <span className="block truncate text-[11px] font-medium text-text-light">
-              {ROLE_HELPER[value]}
+              {selectedDescriptions}
             </span>
           ) : null}
         </span>
@@ -372,7 +456,7 @@ function RoleSelect({
           className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-white p-1.5 shadow-elevated"
         >
           {STAFF_ROLES.map((role) => {
-            const selected = role === value
+            const selected = selectedRoles.includes(role)
 
             return (
               <button
@@ -381,8 +465,7 @@ function RoleSelect({
                 role="option"
                 aria-selected={selected}
                 onClick={() => {
-                  onChange(role)
-                  setOpen(false)
+                  toggleRole(role)
                 }}
                 className={`flex w-full min-w-0 items-start gap-2 rounded-lg px-2.5 py-2 text-left cursor-pointer transition-colors duration-200 ${
                   selected ? 'bg-primary/8 text-primary' : 'text-text hover:bg-background-warm'
@@ -413,7 +496,9 @@ function RoleSelect({
           compact ? 'text-[11px]' : 'text-[11.5px]'
         }`}
       >
-        {compact ? `${roleLabel(value)}: ${ROLE_HELPER[value]}` : ROLE_HELPER[value]}
+        {compact
+          ? selectedRoles.map((role) => `${roleLabel(role)}: ${ROLE_HELPER[role]}`).join(' · ')
+          : selectedDescriptions}
       </p>
     </div>
   )

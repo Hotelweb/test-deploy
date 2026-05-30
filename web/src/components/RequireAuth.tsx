@@ -33,7 +33,7 @@ export function RequireAuth({ scopes, hotelId, children }: RequireAuthProps) {
   }
 
   if (scopes && scopes.length > 0 && !scopes.includes(auth.user.scope)) {
-    return <ForbiddenScreen reason="Bạn không có quyền truy cập trang này" />
+    return <AccessDeniedScreen reason="Bạn không có quyền truy cập trang này" />
   }
 
   if (
@@ -41,13 +41,13 @@ export function RequireAuth({ scopes, hotelId, children }: RequireAuthProps) {
     auth.user.scope === 'hotel' &&
     auth.user.hotel_id !== hotelId
   ) {
-    return <ForbiddenScreen reason="Bạn không thuộc cơ sở này" />
+    return <AccessDeniedScreen reason="Bạn không thuộc cơ sở này" />
   }
 
   return <>{children}</>
 }
 
-function ForbiddenScreen({ reason }: { reason: string }) {
+export function AccessDeniedScreen({ reason }: { reason: string }) {
   const auth = useAuth()
   const dashboardPath =
     auth?.user.scope === 'system'
@@ -57,30 +57,32 @@ function ForbiddenScreen({ reason }: { reason: string }) {
         : '/login'
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background-warm px-6">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center">
-          <svg
-            viewBox="0 0 24 24"
-            className="w-8 h-8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <div className="min-h-screen bg-background-warm px-4 py-8 sm:px-8">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[88rem] items-center justify-center">
+        <section className="w-full max-w-xl rounded-3xl border border-border-light bg-white p-6 text-center shadow-elevated sm:p-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+            <svg
+              viewBox="0 0 24 24"
+              className="w-8 h-8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M4.93 4.93l14.14 14.14" />
+            </svg>
+          </div>
+          <h1 className="text-text font-bold text-xl">Không có quyền truy cập</h1>
+          <p className="text-text-muted text-sm mt-2 leading-relaxed">{reason}</p>
+          <Link
+            to={dashboardPath}
+            className="inline-flex mt-6 h-11 items-center justify-center rounded-xl bg-primary px-4 text-[13.5px] font-semibold text-white hover:bg-primary-dark transition-colors"
           >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M4.93 4.93l14.14 14.14" />
-          </svg>
-        </div>
-        <h1 className="text-text font-bold text-lg">Không có quyền truy cập</h1>
-        <p className="text-text-muted text-sm mt-1">{reason}</p>
-        <Link
-          to={dashboardPath}
-          className="inline-block mt-5 px-4 py-2 rounded-xl text-[13.5px] font-medium text-text-muted bg-white border border-border hover:bg-gray-50 transition-colors"
-        >
-          Về dashboard
-        </Link>
+            Về dashboard
+          </Link>
+        </section>
       </div>
     </div>
   )

@@ -19,6 +19,7 @@ export interface AuthenticatedUser {
   scope: 'system' | 'hotel';
   hotel_id?: number;
   role?: string;
+  roles?: string[];
   avatar_url?: string | null;
   is_active: boolean;
   last_login_at?: Date | null;
@@ -93,6 +94,7 @@ export class AuthService {
       scope: 'hotel',
       hotel_id: Number(user.hotel_id),
       role: user.role,
+      roles: getUserRoles(user),
       avatar_url: user.avatar_url,
       is_active: user.is_active,
       last_login_at: user.last_login_at,
@@ -132,7 +134,11 @@ export class AuthService {
       email: user.email,
     });
     void this.auditLog.record({
-      actor: { sub: user.id, scope: 'system', email: user.email } as TokenPayload,
+      actor: {
+        sub: user.id,
+        scope: 'system',
+        email: user.email,
+      } as TokenPayload,
       action: 'login',
       targetType: 'system_admin',
       targetId: user.id,
@@ -164,6 +170,7 @@ export class AuthService {
       scope: 'hotel',
       hotel_id: Number(user.hotel_id),
       role: user.role,
+      roles: getUserRoles(user),
       avatar_url: user.avatar_url,
       is_active: user.is_active,
       last_login_at: user.last_login_at,
@@ -176,6 +183,7 @@ export class AuthService {
       email: authUser.email,
       hotel_id: authUser.hotel_id,
       role: authUser.role,
+      roles: authUser.roles,
     });
     void this.auditLog.record({
       actor: {
@@ -184,6 +192,7 @@ export class AuthService {
         email: authUser.email,
         hotel_id: authUser.hotel_id,
         role: authUser.role,
+        roles: authUser.roles,
       } as TokenPayload,
       hotelId: authUser.hotel_id,
       action: 'login',
@@ -196,4 +205,8 @@ export class AuthService {
 
 function invalidCreds() {
   return new UnauthorizedException('Invalid email or password');
+}
+
+function getUserRoles(user: HotelUser): string[] {
+  return user.roles?.length ? user.roles : user.role ? [user.role] : [];
 }

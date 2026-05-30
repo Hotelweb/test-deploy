@@ -24,6 +24,7 @@ export interface AuthUser {
   scope: AuthScope
   hotel_id?: number
   role?: HotelStaffRole
+  roles?: HotelStaffRole[]
   avatar_url?: string | null
   is_active: boolean
   last_login_at?: string | null

@@ -24,8 +24,9 @@ export enum HotelStaffRole {
  * A hotel-scoped staff account.
  *
  * The system has only two user types: a single root system admin (table
- * `system_admins`) and per-hotel staff users (this table). Role is intentionally
- * coarse-grained for now; permissions are derived in auth/permissions.ts.
+ * `system_admins`) and per-hotel staff users (this table). `role` is retained
+ * as the primary/legacy role while `roles` enables flexible combined scopes.
+ * Permissions are derived in auth/permissions.ts.
  */
 @Entity('hotel_users')
 export class HotelUser {
@@ -54,6 +55,15 @@ export class HotelUser {
     default: HotelStaffRole.HOTEL_ADMIN,
   })
   role: HotelStaffRole;
+
+  @Column({
+    type: 'enum',
+    enum: HotelStaffRole,
+    enumName: 'hotel_staff_role',
+    array: true,
+    nullable: true,
+  })
+  roles: HotelStaffRole[] | null;
 
   @Column({ type: 'boolean', default: true })
   is_active: boolean;

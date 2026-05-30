@@ -17,6 +17,7 @@ export interface TokenPayload {
   email: string;
   hotel_id?: number;
   role?: string;
+  roles?: string[];
   iat: number;
   exp: number;
 }

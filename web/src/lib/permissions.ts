@@ -3,6 +3,7 @@ import type { AuthUser, HotelStaffRole } from './auth'
 export type StaffPermission =
   | 'orders:view'
   | 'orders:update'
+  | 'hotel:manage'
   | 'services:manage'
   | 'chat:handle'
   | 'reports:view'
@@ -12,12 +13,20 @@ const ROLE_PERMISSIONS: Record<HotelStaffRole, StaffPermission[]> = {
   hotel_admin: [
     'orders:view',
     'orders:update',
+    'hotel:manage',
     'services:manage',
     'chat:handle',
     'reports:view',
     'users:manage',
   ],
-  manager: ['orders:view', 'orders:update', 'services:manage', 'chat:handle', 'reports:view'],
+  manager: [
+    'orders:view',
+    'orders:update',
+    'hotel:manage',
+    'services:manage',
+    'chat:handle',
+    'reports:view',
+  ],
   reception: ['orders:view', 'chat:handle'],
   cashier: ['orders:view', 'orders:update', 'reports:view'],
   fnb_staff: ['orders:view', 'orders:update'],
@@ -29,7 +38,8 @@ const ROLE_PERMISSIONS: Record<HotelStaffRole, StaffPermission[]> = {
 export function can(user: AuthUser | undefined | null, permission: StaffPermission): boolean {
   if (!user) return false
   if (user.scope === 'system') return true
-  return Boolean(user.role && ROLE_PERMISSIONS[user.role]?.includes(permission))
+  const roles = getUserRoles(user)
+  return roles.some((role) => ROLE_PERMISSIONS[role]?.includes(permission))
 }
 
 export function roleLabel(role?: HotelStaffRole): string {
@@ -44,4 +54,12 @@ export function roleLabel(role?: HotelStaffRole): string {
     manager: 'Manager',
   }
   return role ? labels[role] : 'Staff'
+}
+
+export function roleLabels(roles?: HotelStaffRole[]): string {
+  return roles?.length ? roles.map((role) => roleLabel(role)).join(', ') : 'Staff'
+}
+
+export function getUserRoles(user: AuthUser): HotelStaffRole[] {
+  return user.roles?.length ? user.roles : user.role ? [user.role] : []
 }

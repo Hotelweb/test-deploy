@@ -29,6 +29,7 @@ import {
 } from '../auth/jwt-auth.guard.js';
 import type { TokenPayload } from '../auth/token.service.js';
 import { ForbiddenException } from '@nestjs/common';
+import { assertPermission } from '../auth/permissions.js';
 
 @ApiTags('hotels')
 @Controller('hotels')
@@ -160,6 +161,7 @@ export class HotelsController {
     if (user.scope === 'hotel' && user.hotel_id !== id) {
       throw new ForbiddenException('You can only update your own hotel');
     }
+    assertPermission(user, 'hotel:manage');
     return this.hotelsService.update(id, dto);
   }
 
@@ -187,6 +189,7 @@ export class HotelsController {
     if (user.scope === 'hotel' && user.hotel_id !== id) {
       throw new ForbiddenException('You can only regenerate your own hotel QR');
     }
+    assertPermission(user, 'hotel:manage');
     return this.hotelsService.regenerateQrToken(id);
   }
 

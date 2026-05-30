@@ -139,7 +139,7 @@ export function RootAdminPage() {
     <div className="min-h-screen bg-background-warm">
       {/* Header */}
       <header className="glass-nav sticky top-0 z-30 px-4 sm:px-8 lg:px-16 xl:px-20 py-5">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div className="max-w-[88rem] mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h1
               className="text-2xl sm:text-3xl font-bold text-text tracking-tight"
@@ -165,7 +165,7 @@ export function RootAdminPage() {
       </header>
 
       <main className="px-4 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10">
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        <div className="max-w-[88rem] mx-auto flex flex-col gap-6">
           {/* Stats + search */}
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex items-center gap-2 text-[13.5px] text-text-muted">

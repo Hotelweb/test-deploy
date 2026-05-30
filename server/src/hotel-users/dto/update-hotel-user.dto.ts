@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -43,4 +44,15 @@ export class UpdateHotelUserDto {
   @IsOptional()
   @IsEnum(HotelStaffRole)
   role?: HotelStaffRole;
+
+  @ApiPropertyOptional({
+    enum: HotelStaffRole,
+    isArray: true,
+    example: [HotelStaffRole.RECEPTION, HotelStaffRole.CUSTOMER_CARE],
+    description: 'One or more roles assigned to the hotel user.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(HotelStaffRole, { each: true })
+  roles?: HotelStaffRole[];
 }

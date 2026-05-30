@@ -131,6 +131,22 @@ async function seed() {
       END $$;
     `);
 
+    await queryRunner.query(`
+      DO $$ BEGIN
+        CREATE TYPE hotel_staff_role AS ENUM (
+          'hotel_admin',
+          'reception',
+          'cashier',
+          'fnb_staff',
+          'kitchen_staff',
+          'customer_care',
+          'content_manager',
+          'manager'
+        );
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+
     // ============================================================
     // TABLES
     // ============================================================
@@ -198,8 +214,8 @@ async function seed() {
       );
     `);
 
-    // Hotel Users (per-hotel admins). Only one user type lives here:
-    // the hotel admin / manager. There are no other roles.
+    // Hotel Users (per-hotel staff). A user has a primary legacy role plus
+    // a flexible roles array used for combined permission scopes.
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS hotel_users (
         id BIGSERIAL PRIMARY KEY,
@@ -208,6 +224,8 @@ async function seed() {
         password_hash VARCHAR NOT NULL,
         full_name VARCHAR(100) NOT NULL,
         avatar_url TEXT,
+        role hotel_staff_role NOT NULL DEFAULT 'hotel_admin',
+        roles hotel_staff_role[] NOT NULL DEFAULT '{hotel_admin}'::hotel_staff_role[],
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         deleted_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -216,17 +234,21 @@ async function seed() {
     `);
 
     // ----------------------------------------------------------------
-    // Migrate existing hotel_users tables that still carry the old role
-    // column / enum. Idempotent — does nothing on a fresh install.
+    // Migrate existing hotel_users tables in place. Idempotent — does
+    // nothing on a fresh install.
     // ----------------------------------------------------------------
     await queryRunner.query(`
-      DROP INDEX IF EXISTS idx_hotel_users_hotel_role;
-    `);
-    await queryRunner.query(`
-      ALTER TABLE hotel_users DROP COLUMN IF EXISTS role;
-    `);
-    await queryRunner.query(`
       DROP TYPE IF EXISTS hotel_user_role;
+    `);
+    await queryRunner.query(`
+      ALTER TABLE hotel_users
+        ADD COLUMN IF NOT EXISTS role hotel_staff_role NOT NULL DEFAULT 'hotel_admin',
+        ADD COLUMN IF NOT EXISTS roles hotel_staff_role[] NOT NULL DEFAULT '{hotel_admin}'::hotel_staff_role[];
+    `);
+    await queryRunner.query(`
+      UPDATE hotel_users
+      SET roles = ARRAY[role]::hotel_staff_role[]
+      WHERE roles IS NULL OR cardinality(roles) = 0;
     `);
 
     // Services

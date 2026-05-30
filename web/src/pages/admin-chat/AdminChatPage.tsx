@@ -1,4 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
+import { AccessDeniedScreen } from '../../components/RequireAuth'
+import { useAuth } from '../../hooks/useAuth'
+import { can } from '../../lib/permissions'
 import { AdminChatConversation } from './components/AdminChatConversation'
 import { AdminChatSidebar } from './components/AdminChatSidebar'
 import { EmptyState } from './components/EmptyState'
@@ -8,8 +11,12 @@ export function AdminChatPage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()
   const hotelId = Number(hotelIdParam)
   const navigate = useNavigate()
+  const auth = useAuth()
+  const allowed = can(auth?.user, 'chat:handle')
 
-  const chat = useAdminChat(hotelId)
+  const chat = useAdminChat(hotelId, allowed)
+
+  if (!allowed) return <AccessDeniedScreen reason="Bạn không có quyền xử lý hội thoại khách." />
 
   if (chat.loading) {
     return (

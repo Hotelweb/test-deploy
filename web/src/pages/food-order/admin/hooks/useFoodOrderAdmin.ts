@@ -26,7 +26,7 @@ export type MenuModalState = { mode: 'create' } | { mode: 'edit'; item: MenuItem
 
 const ORDERS_PER_PAGE = 20
 
-export function useFoodOrderAdmin(hotelId: number) {
+export function useFoodOrderAdmin(hotelId: number, enabled = true) {
   const auth = useAuth()
   const [hotel, setHotel] = useState<Hotel | null>(null)
   const [tab, setTab] = useState<Tab>('orders')
@@ -58,7 +58,7 @@ export function useFoodOrderAdmin(hotelId: number) {
 
   const loadOrders = useCallback(
     async (page = orderPage, filter = orderFilter) => {
-      if (!hotelId) return
+      if (!hotelId || !enabled) return
       setLoadingOrders(true)
       try {
         const status = filter === 'all' ? undefined : filter
@@ -69,11 +69,14 @@ export function useFoodOrderAdmin(hotelId: number) {
         setLoadingOrders(false)
       }
     },
-    [hotelId, orderFilter, orderPage],
+    [enabled, hotelId, orderFilter, orderPage],
   )
 
   const loadAll = useCallback(async () => {
-    if (!hotelId) return
+    if (!hotelId || !enabled) {
+      setLoading(false)
+      return
+    }
     try {
       const [h, s, a, m, p] = await Promise.all([
         getHotel(hotelId),
@@ -92,7 +95,7 @@ export function useFoodOrderAdmin(hotelId: number) {
     } finally {
       setLoading(false)
     }
-  }, [hotelId])
+  }, [enabled, hotelId])
 
   useEffect(() => {
     let cancelled = false
@@ -105,6 +108,7 @@ export function useFoodOrderAdmin(hotelId: number) {
   }, [loadAll])
 
   useEffect(() => {
+    if (!hotelId || !enabled) return
     const id = window.setInterval(() => {
       void (async () => {
         try {
@@ -131,7 +135,7 @@ export function useFoodOrderAdmin(hotelId: number) {
     return () => {
       window.clearInterval(id)
     }
-  }, [hotelId, orderFilter, orderPage])
+  }, [enabled, hotelId, orderFilter, orderPage])
 
   useEffect(() => {
     let cancelled = false
@@ -206,7 +210,7 @@ export function useFoodOrderAdmin(hotelId: number) {
   }
 
   useChatSocket({
-    hotelId,
+    hotelId: enabled ? hotelId : null,
     role: 'staff',
     onOrderCreated: ({ order }) => {
       playNotificationSound()

@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { HotelUser } from './entities/hotel-user.entity.js';
+import { HotelStaffRole, HotelUser } from './entities/hotel-user.entity.js';
 import { CreateHotelUserDto } from './dto/create-hotel-user.dto.js';
 import { UpdateHotelUserDto } from './dto/update-hotel-user.dto.js';
 
@@ -31,13 +31,16 @@ export class HotelUsersService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
+    const roles = normalizeRoles(dto.roles, dto.role);
+
     const user = this.hotelUserRepo.create({
       hotel_id: dto.hotel_id,
       email: dto.email,
       password_hash: passwordHash,
       full_name: dto.full_name,
       avatar_url: dto.avatar_url,
-      role: dto.role,
+      role: roles[0],
+      roles,
     });
 
     return this.hotelUserRepo.save(user);
@@ -90,7 +93,11 @@ export class HotelUsersService {
     if (dto.full_name !== undefined) user.full_name = dto.full_name;
     if (dto.avatar_url !== undefined) user.avatar_url = dto.avatar_url;
     if (dto.is_active !== undefined) user.is_active = dto.is_active;
-    if (dto.role !== undefined) user.role = dto.role;
+    if (dto.roles !== undefined || dto.role !== undefined) {
+      const roles = normalizeRoles(dto.roles, dto.role ?? user.role);
+      user.role = roles[0];
+      user.roles = roles;
+    }
 
     return this.hotelUserRepo.save(user);
   }
@@ -101,4 +108,14 @@ export class HotelUsersService {
     user.is_active = false;
     await this.hotelUserRepo.save(user);
   }
+}
+
+function normalizeRoles(
+  roles?: HotelStaffRole[],
+  fallbackRole: HotelStaffRole = HotelStaffRole.RECEPTION,
+): HotelStaffRole[] {
+  const unique = Array.from(
+    new Set((roles?.length ? roles : [fallbackRole]).filter(Boolean)),
+  );
+  return unique.length > 0 ? unique : [HotelStaffRole.RECEPTION];
 }
