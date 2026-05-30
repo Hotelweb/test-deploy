@@ -13,11 +13,13 @@ import { Service } from '../../services/entities/service.entity.js';
 import type { MenuCategory } from './menu-item.entity.js';
 
 export type FoodOrderStatus =
-  | 'PENDING'
-  | 'ACCEPTED'
-  | 'REJECTED'
-  | 'COMPLETED'
-  | 'CANCELLED';
+  | 'new'
+  | 'accepted'
+  | 'preparing'
+  | 'delivering'
+  | 'completed'
+  | 'cancelled'
+  | 'rejected';
 
 @Entity('food_orders')
 export class FoodOrder {
@@ -29,6 +31,12 @@ export class FoodOrder {
 
   @Column({ type: 'bigint', nullable: true })
   service_id!: number | null;
+
+  @Column({ type: 'varchar', length: 30, unique: true, nullable: true })
+  order_code!: string | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  idempotency_key!: string | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   room_number!: string | null;
@@ -42,12 +50,7 @@ export class FoodOrder {
   @Column({ type: 'text', nullable: true })
   note!: string | null;
 
-  @Column({
-    type: 'enum',
-    enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'CANCELLED'],
-    enumName: 'food_order_status',
-    default: 'PENDING',
-  })
+  @Column({ type: 'varchar', length: 20, default: 'new' })
   status!: FoodOrderStatus;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
@@ -55,6 +58,21 @@ export class FoodOrder {
 
   @Column({ type: 'text', nullable: true })
   rejected_reason!: string | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  assigned_to_user_id!: number | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  assigned_group!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  assigned_at!: Date | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  last_handled_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  handled_at!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;

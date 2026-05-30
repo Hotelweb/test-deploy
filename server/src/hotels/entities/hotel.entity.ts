@@ -27,6 +27,9 @@ export class Hotel {
   address: string;
 
   @Column({ type: 'text', nullable: true })
+  map_url: string;
+
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ type: 'text', nullable: true })
@@ -42,6 +45,9 @@ export class Hotel {
    */
   @Column({ type: 'text', array: true, default: () => "'{}'" })
   gallery: string[];
+
+  @Column({ type: 'jsonb', nullable: true })
+  theme_config: Record<string, unknown> | null;
 
   @Column({ type: 'uuid', unique: true })
   qr_token: string;

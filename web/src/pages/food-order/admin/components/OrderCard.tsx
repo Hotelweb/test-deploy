@@ -8,9 +8,10 @@ interface OrderCardProps {
   order: FoodOrder
   onAction: (order: FoodOrder, status: FoodOrderStatus) => void
   onOpen: (order: FoodOrder) => void
+  onAssignToMe: (order: FoodOrder) => void
 }
 
-export function OrderCard({ order, onAction, onOpen }: OrderCardProps) {
+export function OrderCard({ order, onAction, onOpen, onAssignToMe }: OrderCardProps) {
   const itemCount = order.items.reduce((sum, line) => sum + line.quantity, 0)
   const createdAt = new Date(order.created_at)
   const createdLabel = createdAt.toLocaleString('vi-VN', {
@@ -25,6 +26,8 @@ export function OrderCard({ order, onAction, onOpen }: OrderCardProps) {
     .map((line) => `${line.quantity}x ${line.item_name}`)
     .join(', ')
   const remainingItems = Math.max(0, order.items.length - 3)
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 60000))
+  const waitingTooLong = ['new', 'accepted', 'preparing'].includes(order.status) && elapsedMinutes >= 15
 
   return (
     <article
@@ -46,7 +49,9 @@ export function OrderCard({ order, onAction, onOpen }: OrderCardProps) {
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-bold leading-tight text-text">#{order.id}</h3>
+              <h3 className="font-bold leading-tight text-text">
+                {order.order_code || `#${order.id}`}
+              </h3>
               <span
                 className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${STATUS_CLASS[order.status]}`}
               >
@@ -54,6 +59,9 @@ export function OrderCard({ order, onAction, onOpen }: OrderCardProps) {
               </span>
             </div>
             <p className="mt-1 truncate text-[12px] text-text-light">{createdLabel}</p>
+            <p className={`mt-1 text-[11px] font-semibold ${waitingTooLong ? 'text-red-600' : 'text-text-light'}`}>
+              Chờ {elapsedMinutes} phút
+            </p>
           </div>
         </div>
 
@@ -102,6 +110,22 @@ export function OrderCard({ order, onAction, onOpen }: OrderCardProps) {
               Ghi chú
             </span>
           ) : null}
+          {order.assigned_to_user_id ? (
+            <span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
+              Đã gán #{order.assigned_to_user_id}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onAssignToMe(order)
+              }}
+              className="rounded-full bg-gray-50 px-2 py-1 text-[11px] font-semibold text-text-muted hover:text-primary"
+            >
+              Nhận đơn
+            </button>
+          )}
           {order.rejected_reason ? (
             <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
               Từ chối
@@ -120,15 +144,15 @@ export function OrderCard({ order, onAction, onOpen }: OrderCardProps) {
         </div>
       </div>
 
-      {order.status === 'PENDING' || order.status === 'ACCEPTED' ? (
+      {['new', 'accepted', 'preparing', 'delivering'].includes(order.status) ? (
         <div className="mt-3 flex flex-col gap-2 border-t border-border-light pt-3 sm:flex-row lg:ml-[3.25rem]">
-          {order.status === 'PENDING' ? (
+          {order.status === 'new' ? (
             <>
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation()
-                  onAction(order, 'ACCEPTED')
+                  onAction(order, 'accepted')
                 }}
                 className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-[13px] font-semibold text-white shadow-card cursor-pointer hover:shadow-card-hover"
               >
@@ -139,19 +163,41 @@ export function OrderCard({ order, onAction, onOpen }: OrderCardProps) {
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation()
-                  onAction(order, 'REJECTED')
+                  onAction(order, 'rejected')
                 }}
                 className="h-9 rounded-xl bg-red-50 px-3 text-[13px] font-semibold text-red-700 cursor-pointer hover:bg-red-100"
               >
                 Từ chối
               </button>
             </>
+          ) : order.status === 'accepted' ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onAction(order, 'preparing')
+              }}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-[13px] font-semibold text-white shadow-card cursor-pointer hover:shadow-card-hover"
+            >
+              Đang chuẩn bị
+            </button>
+          ) : order.status === 'preparing' ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onAction(order, 'delivering')
+              }}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-cyan-600 px-3 text-[13px] font-semibold text-white shadow-card cursor-pointer hover:shadow-card-hover"
+            >
+              Đang giao
+            </button>
           ) : (
             <button
               type="button"
               onClick={(event) => {
                 event.stopPropagation()
-                onAction(order, 'COMPLETED')
+                onAction(order, 'completed')
               }}
               className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-[13px] font-semibold text-white shadow-card cursor-pointer hover:shadow-card-hover"
             >
@@ -169,9 +215,10 @@ interface OrderDetailModalProps {
   order: FoodOrder
   onClose: () => void
   onAction: (order: FoodOrder, status: FoodOrderStatus) => void
+  onAssignToMe: (order: FoodOrder) => void
 }
 
-export function OrderDetailModal({ order, onClose, onAction }: OrderDetailModalProps) {
+export function OrderDetailModal({ order, onClose, onAction, onAssignToMe }: OrderDetailModalProps) {
   const itemCount = order.items.reduce((sum, line) => sum + line.quantity, 0)
   const createdLabel = new Date(order.created_at).toLocaleString('vi-VN', {
     hour: '2-digit',
@@ -194,7 +241,9 @@ export function OrderDetailModal({ order, onClose, onAction }: OrderDetailModalP
         <header className="flex items-start justify-between gap-4 border-b border-border-light px-5 py-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-bold text-text">Đơn #{order.id}</h2>
+              <h2 className="text-xl font-bold text-text">
+                Đơn {order.order_code || `#${order.id}`}
+              </h2>
               <span
                 className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${STATUS_CLASS[order.status]}`}
               >
@@ -222,6 +271,10 @@ export function OrderDetailModal({ order, onClose, onAction }: OrderDetailModalP
             <InfoPill label="Mã khách sạn" value={`#${order.hotel_id}`} />
             <InfoPill label="Số món" value={`${itemCount} món`} />
             <InfoPill label="Cập nhật" value={updatedLabel} />
+            <InfoPill
+              label="Phụ trách"
+              value={order.assigned_to_user_id ? `#${order.assigned_to_user_id}` : 'Chưa gán'}
+            />
             <InfoPill label="Tổng tiền" value={formatVnd(order.total_amount)} strong />
           </section>
 
@@ -267,29 +320,54 @@ export function OrderDetailModal({ order, onClose, onAction }: OrderDetailModalP
             </section>
           ) : null}
 
-          {order.status === 'PENDING' || order.status === 'ACCEPTED' ? (
+          {['new', 'accepted', 'preparing', 'delivering'].includes(order.status) ? (
             <div className="flex flex-col sm:flex-row gap-2 border-t border-border-light pt-4">
-              {order.status === 'PENDING' ? (
+              {!order.assigned_to_user_id ? (
+                <button
+                  type="button"
+                  onClick={() => onAssignToMe(order)}
+                  className="flex-1 rounded-xl border border-border-light px-4 py-3 text-[13px] font-bold text-text-muted hover:text-primary cursor-pointer"
+                >
+                  Nhận xử lý
+                </button>
+              ) : null}
+              {order.status === 'new' ? (
                 <>
                   <button
                     type="button"
-                    onClick={() => onAction(order, 'ACCEPTED')}
+                    onClick={() => onAction(order, 'accepted')}
                     className="flex-1 rounded-xl bg-primary px-4 py-3 text-[13px] font-bold text-white shadow-card hover:shadow-card-hover cursor-pointer"
                   >
                     Chấp nhận đơn
                   </button>
                   <button
                     type="button"
-                    onClick={() => onAction(order, 'REJECTED')}
+                    onClick={() => onAction(order, 'rejected')}
                     className="flex-1 rounded-xl bg-red-50 px-4 py-3 text-[13px] font-bold text-red-700 hover:bg-red-100 cursor-pointer"
                   >
                     Từ chối đơn
                   </button>
                 </>
+              ) : order.status === 'accepted' ? (
+                <button
+                  type="button"
+                  onClick={() => onAction(order, 'preparing')}
+                  className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-[13px] font-bold text-white shadow-card hover:shadow-card-hover cursor-pointer"
+                >
+                  Chuyển sang đang chuẩn bị
+                </button>
+              ) : order.status === 'preparing' ? (
+                <button
+                  type="button"
+                  onClick={() => onAction(order, 'delivering')}
+                  className="w-full rounded-xl bg-cyan-600 px-4 py-3 text-[13px] font-bold text-white shadow-card hover:shadow-card-hover cursor-pointer"
+                >
+                  Chuyển sang đang giao
+                </button>
               ) : (
                 <button
                   type="button"
-                  onClick={() => onAction(order, 'COMPLETED')}
+                  onClick={() => onAction(order, 'completed')}
                   className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-[13px] font-bold text-white shadow-card hover:shadow-card-hover cursor-pointer"
                 >
                   Đánh dấu đã giao

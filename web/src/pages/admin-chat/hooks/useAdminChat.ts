@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getChatMessages, getHotel, getHotelSessions, markSessionRead } from '../../../api'
-import type { ChatMessage, ChatSession, Hotel } from '../../../api'
+import {
+  assignChatSession,
+  getChatMessages,
+  getHotel,
+  getHotelSessions,
+  getHotelUsers,
+  markSessionRead,
+  updateSessionStatus,
+} from '../../../api'
+import type { ChatMessage, ChatSession, Hotel, HotelUser } from '../../../api'
 import type { DisplayMessage } from '../../../components/messages/MessageBubble'
 import { useChatSocket } from '../../../hooks/useChatSocket'
 import {
@@ -8,17 +16,27 @@ import {
   requestNotificationPermission,
   showBrowserNotification,
 } from '../../../lib/notifications'
+import {
+  ChatMessageStatusValue,
+  ChatMessageTypeValue,
+  ChatReadActor,
+  ChatSenderType,
+  ChatSocketRole,
+  ChatTranslationStatusValue,
+  type ChatOutboundMessageType,
+} from '../../../lib/socketEvents'
 import { ADMIN_LANG, FILTERS, STAFF_USER_ID, type FilterKey } from '../consts'
 
-export function useAdminChat(hotelId: number) {
+export function useAdminChat(hotelId: number, enabled = true) {
   const [hotel, setHotel] = useState<Hotel | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [staff, setStaff] = useState<HotelUser[]>([])
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
@@ -35,15 +53,23 @@ export function useAdminChat(hotelId: number) {
   }, [activeSession?.id])
 
   useEffect(() => {
-    if (!hotelId) return
+    if (!hotelId || !enabled) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
 
     const load = async () => {
       try {
-        const [h, s] = await Promise.all([getHotel(hotelId), getHotelSessions(hotelId)])
+        const [h, s, users] = await Promise.all([
+          getHotel(hotelId),
+          getHotelSessions(hotelId),
+          getHotelUsers(hotelId).catch(() => []),
+        ])
         if (cancelled) return
         setHotel(h)
         setSessions(s)
+        setStaff(users)
       } catch (err) {
         console.error('Failed to load admin dashboard:', err)
       } finally {
@@ -55,7 +81,7 @@ export function useAdminChat(hotelId: number) {
     return () => {
       cancelled = true
     }
-  }, [hotelId])
+  }, [enabled, hotelId])
 
   useEffect(() => {
     if (typeof Notification === 'undefined') return
@@ -101,7 +127,7 @@ export function useAdminChat(hotelId: number) {
       })
 
       if (
-        data.message.sender_type === 'CUSTOMER' &&
+        data.message.sender_type === ChatSenderType.Customer &&
         data.message.session_id !== activeSessionIdRef.current
       ) {
         if (soundEnabled) playNotificationSound()
@@ -117,27 +143,29 @@ export function useAdminChat(hotelId: number) {
   )
 
   const handleTyping = useCallback(
-    (data: { sessionId: number; sender_type: 'CUSTOMER' | 'STAFF'; isTyping: boolean }) => {
+    (data: { sessionId: number; sender_type: ChatSenderType; isTyping: boolean }) => {
       if (data.sessionId !== activeSessionIdRef.current) return
-      if (data.sender_type === 'CUSTOMER') setGuestTyping(data.isTyping)
+      if (data.sender_type === ChatSenderType.Customer) setGuestTyping(data.isTyping)
     },
     [],
   )
 
-  const handleMessagesRead = useCallback(
-    (data: { sessionId: number; by: 'customer' | 'staff' }) => {
-      if (data.sessionId !== activeSessionIdRef.current) return
-      if (data.by !== 'customer') return
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.sender_type === 'STAFF' && !m.is_read
-            ? { ...m, is_read: true, status: 'READ', read_at: new Date().toISOString() }
-            : m,
-        ),
-      )
-    },
-    [],
-  )
+  const handleMessagesRead = useCallback((data: { sessionId: number; by: ChatReadActor }) => {
+    if (data.sessionId !== activeSessionIdRef.current) return
+    if (data.by !== ChatReadActor.Customer) return
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.sender_type === ChatSenderType.Staff && !m.is_read
+          ? {
+              ...m,
+              is_read: true,
+              status: ChatMessageStatusValue.Read,
+              read_at: new Date().toISOString(),
+            }
+          : m,
+      ),
+    )
+  }, [])
 
   const handleSessionUnreadUpdate = useCallback(
     (data: { sessionId: number; unread_count: number }) => {
@@ -163,8 +191,8 @@ export function useAdminChat(hotelId: number) {
     markRead,
   } = useChatSocket({
     sessionId: activeSession?.id ?? null,
-    hotelId,
-    role: 'staff',
+    hotelId: enabled ? hotelId : null,
+    role: ChatSocketRole.Staff,
     onNewMessage: handleNewMessage,
     onTyping: handleTyping,
     onMessagesRead: handleMessagesRead,
@@ -180,7 +208,10 @@ export function useAdminChat(hotelId: number) {
   useEffect(() => {
     if (!activeSession) return
     const hasUnread = messages.some(
-      (m) => m.sender_type === 'CUSTOMER' && !m.is_read && m.message_type !== 'SYSTEM',
+      (m) =>
+        m.sender_type === ChatSenderType.Customer &&
+        !m.is_read &&
+        m.message_type !== ChatMessageTypeValue.System,
     )
     if (!hasUnread) return
     if (connection !== 'online') return
@@ -189,11 +220,11 @@ export function useAdminChat(hotelId: number) {
     const run = async () => {
       try {
         markRead()
-        await markSessionRead(activeSession.id, 'staff').catch(() => undefined)
+        await markSessionRead(activeSession.id, ChatReadActor.Staff).catch(() => undefined)
         if (cancelled) return
         setMessages((prev) =>
           prev.map((m) =>
-            m.sender_type === 'CUSTOMER' && !m.is_read ? { ...m, is_read: true } : m,
+            m.sender_type === ChatSenderType.Customer && !m.is_read ? { ...m, is_read: true } : m,
           ),
         )
         setSessions((prev) =>
@@ -226,7 +257,7 @@ export function useAdminChat(hotelId: number) {
   }, [])
 
   const performSend = useCallback(
-    (text: string, opts?: { messageType?: 'TEXT' | 'IMAGE'; imageUrl?: string }) => {
+    (text: string, opts?: { messageType?: ChatOutboundMessageType; imageUrl?: string }) => {
       if (!activeSession) return
       const trimmed = text.trim()
       if (!trimmed && !opts?.imageUrl) return
@@ -235,17 +266,17 @@ export function useAdminChat(hotelId: number) {
       const optimistic: DisplayMessage = {
         id: -Date.now(),
         session_id: activeSession.id,
-        sender_type: 'STAFF',
-        message_type: opts?.messageType ?? 'TEXT',
+        sender_type: ChatSenderType.Staff,
+        message_type: opts?.messageType ?? ChatMessageTypeValue.Text,
         source_language: ADMIN_LANG,
         target_language: activeSession.customer_language,
         original_message: trimmed || null,
         translated_message: null,
-        translation_status: 'PENDING',
+        translation_status: ChatTranslationStatusValue.Pending,
         translation_provider: null,
         translation_duration_ms: null,
         image_url: opts?.imageUrl ?? null,
-        status: 'SENDING',
+        status: ChatMessageStatusValue.Sending,
         client_message_id: clientId,
         is_read: false,
         read_at: null,
@@ -258,7 +289,7 @@ export function useAdminChat(hotelId: number) {
         sessionId: activeSession.id,
         message: trimmed,
         source_language: ADMIN_LANG,
-        sender_type: 'STAFF',
+        sender_type: ChatSenderType.Staff,
         sender_user_id: STAFF_USER_ID,
         client_message_id: clientId,
         message_type: opts?.messageType,
@@ -276,7 +307,7 @@ export function useAdminChat(hotelId: number) {
         setMessages((prev) =>
           prev.map((m) =>
             m.client_message_id === clientId && m._optimistic
-              ? { ...m, _failed: true, _optimistic: false, status: 'FAILED' }
+              ? { ...m, _failed: true, _optimistic: false, status: ChatMessageStatusValue.Failed }
               : m,
           ),
         )
@@ -306,7 +337,7 @@ export function useAdminChat(hotelId: number) {
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = reader.result as string
-      performSend('', { messageType: 'IMAGE', imageUrl: dataUrl })
+      performSend('', { messageType: ChatMessageTypeValue.Image, imageUrl: dataUrl })
     }
     reader.readAsDataURL(file)
     e.target.value = ''
@@ -315,9 +346,29 @@ export function useAdminChat(hotelId: number) {
   const handleRetry = (msg: DisplayMessage) => {
     setMessages((prev) => prev.filter((m) => m.client_message_id !== msg.client_message_id))
     performSend(msg.original_message ?? '', {
-      messageType: msg.message_type === 'IMAGE' ? 'IMAGE' : 'TEXT',
+      messageType:
+        msg.message_type === ChatMessageTypeValue.Image
+          ? ChatMessageTypeValue.Image
+          : ChatMessageTypeValue.Text,
       imageUrl: msg.image_url ?? undefined,
     })
+  }
+
+  const handleAssignSession = async (staffId: number | null) => {
+    if (!activeSession) return
+    const updated = await assignChatSession(activeSession.id, {
+      assigned_to_user_id: staffId,
+      assigned_group: staffId ? undefined : 'customer_care',
+    })
+    setActiveSession(updated)
+    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+  }
+
+  const handleResolveSession = async () => {
+    if (!activeSession) return
+    const updated = await updateSessionStatus(activeSession.id, 'RESOLVED')
+    setActiveSession(updated)
+    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
   }
 
   const typingTimerRef = useRef<number | null>(null)
@@ -359,13 +410,13 @@ export function useAdminChat(hotelId: number) {
       all: sessions.length,
       active: 0,
       waiting: 0,
-      booked: 0,
+      resolved: 0,
       closed: 0,
     }
     for (const s of sessions) {
-      if (s.status === 'OPEN') counts.waiting++
+      if (s.status === 'OPEN' || s.status === 'PENDING') counts.waiting++
       else if (s.status === 'ASSIGNED') counts.active++
-      else if (s.status === 'BOOKED') counts.booked++
+      else if (s.status === 'BOOKED' || s.status === 'RESOLVED') counts.resolved++
       else if (s.status === 'CLOSED') counts.closed++
     }
     return counts
@@ -391,6 +442,7 @@ export function useAdminChat(hotelId: number) {
 
   return {
     hotel,
+    staff,
     loading,
     activeSession,
     setActiveSession,
@@ -420,6 +472,8 @@ export function useAdminChat(hotelId: number) {
     handleAttachClick,
     handleFileChange,
     handleRetry,
+    handleAssignSession,
+    handleResolveSession,
     toggleNotifications,
   }
 }

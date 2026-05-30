@@ -254,7 +254,7 @@ function EditCurrentUserModal({ onClose }: { onClose: () => void }) {
     >
       <div className="min-h-full flex items-start justify-center p-4 sm:py-8">
         <div
-          className="w-full max-w-3xl bg-white rounded-3xl shadow-modal max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] flex flex-col animate-scale-in"
+          className="w-full max-w-xl bg-white rounded-3xl shadow-modal max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] flex flex-col animate-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-6 py-4 border-b border-border-light flex items-center justify-between flex-shrink-0">
@@ -292,7 +292,7 @@ function EditCurrentUserModal({ onClose }: { onClose: () => void }) {
               </div>
             ) : null}
 
-            <section className="space-y-3">
+            <section className="space-y-4">
               <h3 className="text-[12px] font-semibold uppercase tracking-wide text-text-light">
                 Thông tin tài khoản
               </h3>
@@ -321,18 +321,22 @@ function EditCurrentUserModal({ onClose }: { onClose: () => void }) {
                 </Field>
               </div>
 
-              <div>
-                <span className="block text-[12.5px] font-medium text-text-muted mb-1.5">
-                  Avatar
-                </span>
+              <div className="flex items-center gap-4 rounded-2xl border border-border-light bg-gray-50/60 p-3">
                 <ImageUploader
                   value={avatarUrl || null}
                   onChange={(next) => setAvatarUrl(next ?? '')}
                   folder="misc"
                   aspect="square"
                   ariaLabel="Chọn avatar người dùng"
-                  hint="Bấm hoặc kéo ảnh vào đây để cập nhật avatar"
+                  size="compact"
+                  className="h-24 w-24 shrink-0"
                 />
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-semibold text-text-muted">Avatar</p>
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-text-light">
+                    Bấm vào ô ảnh để tải avatar mới. Hỗ trợ PNG, JPG, WebP, GIF, SVG tối đa 5 MB.
+                  </p>
+                </div>
               </div>
 
               <Field label="Mật khẩu mới" hint="Để trống nếu không đổi mật khẩu">

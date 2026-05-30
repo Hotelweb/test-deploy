@@ -443,6 +443,15 @@ export const UserCircleIcon = ({ className = 'w-5 h-5' }: IconProps = {}) => (
   </svg>
 )
 
+export const PeopleIcon = ({ className = 'w-5 h-5' }: IconProps = {}) => (
+  <svg viewBox="0 0 24 24" className={className} {...baseProps}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
 export const CalendarIcon = ({ className = 'w-4 h-4' }: IconProps = {}) => (
   <svg viewBox="0 0 24 24" className={className} {...baseProps}>
     <rect width="18" height="18" x="3" y="4" rx="2" />
@@ -498,6 +507,17 @@ export const SettingsIcon = ({ className = 'w-4 h-4' }: IconProps = {}) => (
   <svg viewBox="0 0 24 24" className={className} {...baseProps}>
     <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
     <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+// Palette / theme editor
+export const PaletteIcon = ({ className = 'w-4 h-4' }: IconProps = {}) => (
+  <svg viewBox="0 0 24 24" className={className} {...baseProps}>
+    <path d="M12 3a9 9 0 0 0 0 18h1.5a1.8 1.8 0 0 0 1.2-3.15 1.8 1.8 0 0 1 1.2-3.15H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3Z" />
+    <circle cx="7.5" cy="10.5" r=".75" fill="currentColor" />
+    <circle cx="10" cy="7.5" r=".75" fill="currentColor" />
+    <circle cx="14" cy="7.5" r=".75" fill="currentColor" />
+    <circle cx="16.5" cy="10.5" r=".75" fill="currentColor" />
   </svg>
 )
 

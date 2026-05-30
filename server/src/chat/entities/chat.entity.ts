@@ -12,7 +12,9 @@ import { HotelUser } from '../../hotel-users/entities/hotel-user.entity.js';
 
 export enum ChatSessionStatus {
   OPEN = 'OPEN',
+  PENDING = 'PENDING',
   ASSIGNED = 'ASSIGNED',
+  RESOLVED = 'RESOLVED',
   BOOKED = 'BOOKED',
   CLOSED = 'CLOSED',
 }
@@ -65,7 +67,22 @@ export class CustomerSession {
   customer_token: string;
 
   @Column({ type: 'bigint', nullable: true })
-  assigned_user_id: number;
+  assigned_user_id: number | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  assigned_group: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  assigned_at: Date | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  last_handled_by: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  handled_at: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  internal_note: string | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   customer_name: string;

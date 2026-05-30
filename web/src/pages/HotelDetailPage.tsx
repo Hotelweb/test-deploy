@@ -3,13 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHotelBySlug, getHotelServices } from '../api'
 import type { Hotel, HotelService } from '../api'
-import { HotelCard } from '../components/HotelCard'
 import { ChatButton } from '../components/messages/ChatButton'
 import { ChatWindow } from '../components/messages/ChatWindow'
 import { HotelDetailServices } from '../components/services/HotelDetailServices'
 import { HotelGallery } from '../components/HotelGallery'
 import { ServiceDetailModal } from '../components/services/ServiceDetailModal'
 import { TopHeader } from '../components/TopHeader'
+import { applyHotelTheme, resetHotelTheme } from '../lib/theme'
 import heroImage from '../assets/hero.png'
 
 function roundRect(
@@ -41,7 +41,9 @@ export function HotelDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showChat, setShowChat] = useState(false)
-  const [lang, setLang] = useState<'VN' | 'EN'>('VN')
+  const [lang, setLang] = useState<'VN' | 'EN'>(() =>
+    navigator.language.toLowerCase().startsWith('vi') ? 'VN' : 'EN',
+  )
   const [activeService, setActiveService] = useState<HotelService | null>(null)
   const qrRef = useRef<SVGSVGElement | null>(null)
 
@@ -52,6 +54,7 @@ export function HotelDetailPage() {
       try {
         setLoading(true)
         const hotelData = await getHotelBySlug(slug!)
+        applyHotelTheme(hotelData.theme_config)
         setHotel(hotelData)
 
         const servicesData = await getHotelServices(hotelData.id, lang === 'VN' ? 'vi' : 'en')
@@ -66,6 +69,12 @@ export function HotelDetailPage() {
 
     loadHotel()
   }, [slug, lang])
+
+  useEffect(() => {
+    if (!hotel) return
+    applyHotelTheme(hotel.theme_config)
+    return () => resetHotelTheme()
+  }, [hotel])
 
   if (loading) {
     return (
@@ -107,6 +116,9 @@ export function HotelDetailPage() {
   }
 
   const hotelPageUrl = `${window.location.origin}/hotel/${hotel.slug}`
+  const primaryColor =
+    getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() ||
+    '#2D5016'
   const downloadQr = () => {
     const svg = qrRef.current
     if (!svg) return
@@ -177,7 +189,7 @@ export function HotelDetailPage() {
       ctx.stroke()
       ctx.drawImage(image, 220, 390, 460, 460)
 
-      ctx.fillStyle = '#2D5016'
+      ctx.fillStyle = primaryColor
       ctx.font = 'bold 28px Arial, sans-serif'
       ctx.fillText(
         lang === 'VN' ? 'Quét mã để xem dịch vụ' : 'Scan to view services',
@@ -228,7 +240,7 @@ export function HotelDetailPage() {
                   size={80}
                   level="M"
                   bgColor="#ffffff"
-                  fgColor="#2D5016"
+                  fgColor={primaryColor}
                 />
                 <button
                   type="button"
@@ -249,7 +261,7 @@ export function HotelDetailPage() {
                 size={88}
                 level="M"
                 bgColor="#ffffff"
-                fgColor="#2D5016"
+                fgColor={primaryColor}
               />
             </div>
             <div className="min-w-0 flex-1">
@@ -272,7 +284,37 @@ export function HotelDetailPage() {
           </section>
 
           {/* Hotel Info Card */}
-          <HotelCard name={hotel.name} address={hotel.address || ''} onClick={() => {}} />
+          <section className="glass-card rounded-3xl p-5 sm:p-6">
+            <div className="flex items-start gap-4">
+              {hotel.logo_url ? (
+                <img
+                  src={hotel.logo_url}
+                  alt={`${hotel.name} logo`}
+                  className="h-16 w-16 rounded-2xl object-cover border border-border-light"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-bold text-text sm:text-2xl">{hotel.name}</h1>
+                {hotel.address ? (
+                  <p className="mt-1 text-[14px] text-text-light">{hotel.address}</p>
+                ) : null}
+                <div className="mt-4 grid gap-2 text-[13px] text-text-muted sm:grid-cols-2">
+                  {hotel.phone ? <a href={`tel:${hotel.phone}`}>Hotline: {hotel.phone}</a> : null}
+                  {hotel.email ? <a href={`mailto:${hotel.email}`}>Email: {hotel.email}</a> : null}
+                  {hotel.map_url ? (
+                    <a
+                      href={hotel.map_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary font-semibold"
+                    >
+                      {lang === 'VN' ? 'Xem bản đồ' : 'Open map'}
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </section>
 
           {/* Hotel description */}
           {hotel.description ? (

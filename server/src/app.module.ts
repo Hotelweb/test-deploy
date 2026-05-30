@@ -10,6 +10,7 @@ import { ChatModule } from './chat/chat.module';
 import { FoodOrderModule } from './food-order/food-order.module';
 import { AuthModule } from './auth/auth.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UploadsModule } from './uploads/uploads.module';
     DatabaseModule,
     AuthModule,
     UploadsModule,
+    AuditLogModule,
     HotelsModule,
     HotelUsersModule,
     ServicesModule,

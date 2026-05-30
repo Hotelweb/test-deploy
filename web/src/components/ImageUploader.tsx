@@ -19,6 +19,7 @@ interface ImageUploaderProps {
   ariaLabel?: string
   /** Inline help shown below the dropzone. */
   hint?: string
+  size?: 'default' | 'compact'
   className?: string
 }
 
@@ -48,6 +49,7 @@ export function ImageUploader({
   aspect = 'wide',
   ariaLabel = 'Tải ảnh lên',
   hint,
+  size = 'default',
   className,
 }: ImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -117,6 +119,7 @@ export function ImageUploader({
   }
 
   const showImage = value && !uploading
+  const compact = size === 'compact'
 
   return (
     <div className={className}>
@@ -162,13 +165,17 @@ export function ImageUploader({
               type="button"
               onClick={handleClear}
               aria-label="Xoá ảnh"
-              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer transition-colors backdrop-blur"
+              className={`absolute rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer transition-colors backdrop-blur ${
+                compact ? 'top-1.5 right-1.5 h-6 w-6' : 'top-2 right-2 h-8 w-8'
+              }`}
             >
-              <CloseIcon className="w-4 h-4" />
+              <CloseIcon className={compact ? 'h-3.5 w-3.5' : 'w-4 h-4'} />
             </button>
-            <div className="absolute bottom-0 inset-x-0 px-3 py-1.5 bg-gradient-to-t from-black/50 to-transparent text-white text-[11.5px] font-medium opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-              Bấm để thay ảnh
-            </div>
+            {!compact ? (
+              <div className="absolute bottom-0 inset-x-0 px-3 py-1.5 bg-gradient-to-t from-black/50 to-transparent text-white text-[11.5px] font-medium opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                Bấm để thay ảnh
+              </div>
+            ) : null}
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 gap-1.5 text-text-muted">
@@ -187,13 +194,21 @@ export function ImageUploader({
               </>
             ) : (
               <>
-                <span className="w-10 h-10 rounded-xl bg-emerald-50 text-primary flex items-center justify-center">
-                  <ImagePlaceholderIcon className="w-5 h-5" />
+                <span
+                  className={`rounded-xl bg-emerald-50 text-primary flex items-center justify-center ${
+                    compact ? 'h-8 w-8' : 'w-10 h-10'
+                  }`}
+                >
+                  <ImagePlaceholderIcon className={compact ? 'h-4 w-4' : 'w-5 h-5'} />
                 </span>
-                <p className="text-[12.5px] font-semibold text-text">Bấm hoặc kéo ảnh vào đây</p>
-                <p className="text-[11px] text-text-light leading-snug">
-                  PNG, JPG, WebP, GIF, SVG · tối đa 5 MB
+                <p className="text-[12.5px] font-semibold text-text">
+                  {compact ? 'Chọn ảnh' : 'Bấm hoặc kéo ảnh vào đây'}
                 </p>
+                {!compact ? (
+                  <p className="text-[11px] text-text-light leading-snug">
+                    PNG, JPG, WebP, GIF, SVG · tối đa 5 MB
+                  </p>
+                ) : null}
               </>
             )}
           </div>

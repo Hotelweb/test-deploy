@@ -10,6 +10,7 @@ import { SystemAdmin } from '../system-admins/entities/system-admin.entity.js';
 import { HotelUser } from '../hotel-users/entities/hotel-user.entity.js';
 import { LoginDto } from './dto/login.dto.js';
 import { TokenPayload, TokenService } from './token.service.js';
+import { AuditLogService } from '../audit-log/audit-log.service.js';
 
 export interface AuthenticatedUser {
   id: number;
@@ -17,8 +18,11 @@ export interface AuthenticatedUser {
   full_name: string;
   scope: 'system' | 'hotel';
   hotel_id?: number;
+  role?: string;
+  roles?: string[];
   avatar_url?: string | null;
   is_active: boolean;
+  last_login_at?: Date | null;
 }
 
 export interface LoginResult {
@@ -34,6 +38,7 @@ export class AuthService {
     @InjectRepository(HotelUser)
     private readonly hotelUserRepo: Repository<HotelUser>,
     private readonly tokenService: TokenService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   /**
@@ -88,8 +93,11 @@ export class AuthService {
       full_name: user.full_name,
       scope: 'hotel',
       hotel_id: Number(user.hotel_id),
+      role: user.role,
+      roles: getUserRoles(user),
       avatar_url: user.avatar_url,
       is_active: user.is_active,
+      last_login_at: user.last_login_at,
     };
   }
 
@@ -125,6 +133,16 @@ export class AuthService {
       scope: 'system',
       email: user.email,
     });
+    void this.auditLog.record({
+      actor: {
+        sub: user.id,
+        scope: 'system',
+        email: user.email,
+      } as TokenPayload,
+      action: 'login',
+      targetType: 'system_admin',
+      targetId: user.id,
+    });
     return { access_token, user };
   }
 
@@ -151,14 +169,35 @@ export class AuthService {
       full_name: user.full_name,
       scope: 'hotel',
       hotel_id: Number(user.hotel_id),
+      role: user.role,
+      roles: getUserRoles(user),
       avatar_url: user.avatar_url,
       is_active: user.is_active,
+      last_login_at: user.last_login_at,
     };
+    user.last_login_at = new Date();
+    await this.hotelUserRepo.save(user);
     const access_token = this.tokenService.sign({
       sub: authUser.id,
       scope: 'hotel',
       email: authUser.email,
       hotel_id: authUser.hotel_id,
+      role: authUser.role,
+      roles: authUser.roles,
+    });
+    void this.auditLog.record({
+      actor: {
+        sub: authUser.id,
+        scope: 'hotel',
+        email: authUser.email,
+        hotel_id: authUser.hotel_id,
+        role: authUser.role,
+        roles: authUser.roles,
+      } as TokenPayload,
+      hotelId: authUser.hotel_id,
+      action: 'login',
+      targetType: 'hotel_user',
+      targetId: authUser.id,
     });
     return { access_token, user: authUser };
   }
@@ -166,4 +205,8 @@ export class AuthService {
 
 function invalidCreds() {
   return new UnauthorizedException('Invalid email or password');
+}
+
+function getUserRoles(user: HotelUser): string[] {
+  return user.roles?.length ? user.roles : user.role ? [user.role] : [];
 }

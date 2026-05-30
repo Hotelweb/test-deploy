@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
+  IsObject,
   IsEmail,
   IsOptional,
   IsString,
@@ -28,6 +29,11 @@ export class UpdateHotelDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @ApiPropertyOptional({ example: 'https://maps.google.com/?q=Grand+Palace' })
+  @IsOptional()
+  @IsString()
+  map_url?: string;
 
   @ApiPropertyOptional({ example: 'Luxury 5-star hotel' })
   @IsOptional()
@@ -56,6 +62,27 @@ export class UpdateHotelDto {
   @IsArray()
   @IsUrl({ require_protocol: true }, { each: true })
   gallery?: string[];
+
+  @ApiPropertyOptional({
+    type: Object,
+    description:
+      'Runtime theme tokens for the guest web UI. Supports mode, preset, and color overrides.',
+    example: {
+      mode: 'system',
+      preset: 'emerald-gold',
+      colors: {
+        primary: '#2d5016',
+        secondary: '#8b9d83',
+        accent: '#d4af37',
+        background: '#fafaf9',
+        surface: '#ffffff',
+        text: '#111827',
+      },
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  theme_config?: Record<string, unknown> | null;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

@@ -126,7 +126,23 @@ async function seed() {
 
     await queryRunner.query(`
       DO $$ BEGIN
-        CREATE TYPE food_order_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'CANCELLED');
+        CREATE TYPE food_order_status AS ENUM ('new', 'accepted', 'preparing', 'delivering', 'completed', 'cancelled', 'rejected');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+
+    await queryRunner.query(`
+      DO $$ BEGIN
+        CREATE TYPE hotel_staff_role AS ENUM (
+          'hotel_admin',
+          'reception',
+          'cashier',
+          'fnb_staff',
+          'kitchen_staff',
+          'customer_care',
+          'content_manager',
+          'manager'
+        );
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);
@@ -145,10 +161,12 @@ async function seed() {
         phone VARCHAR(20),
         email VARCHAR(255),
         address TEXT,
+        map_url TEXT,
         description TEXT,
         logo_url TEXT,
         banner_url TEXT,
         gallery TEXT[] NOT NULL DEFAULT '{}',
+        theme_config JSONB,
         qr_token UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -166,7 +184,27 @@ async function seed() {
 
     await queryRunner.query(`
       ALTER TABLE hotels
+        ADD COLUMN IF NOT EXISTS theme_config JSONB;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE hotels
+        ADD COLUMN IF NOT EXISTS map_url TEXT;
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE hotels
         ALTER COLUMN qr_token SET DEFAULT gen_random_uuid();
+    `);
+
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS hotel_qr_open_events (
+        id BIGSERIAL PRIMARY KEY,
+        hotel_id BIGINT NOT NULL,
+        source VARCHAR(20) NOT NULL,
+        room_token VARCHAR(120),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
 
     // System Admins
@@ -182,8 +220,8 @@ async function seed() {
       );
     `);
 
-    // Hotel Users (per-hotel admins). Only one user type lives here:
-    // the hotel admin / manager. There are no other roles.
+    // Hotel Users (per-hotel staff). A user has a primary legacy role plus
+    // a flexible roles array used for combined permission scopes.
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS hotel_users (
         id BIGSERIAL PRIMARY KEY,
@@ -192,6 +230,8 @@ async function seed() {
         password_hash VARCHAR NOT NULL,
         full_name VARCHAR(100) NOT NULL,
         avatar_url TEXT,
+        role hotel_staff_role NOT NULL DEFAULT 'hotel_admin',
+        roles hotel_staff_role[] NOT NULL DEFAULT '{hotel_admin}'::hotel_staff_role[],
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         deleted_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -200,17 +240,21 @@ async function seed() {
     `);
 
     // ----------------------------------------------------------------
-    // Migrate existing hotel_users tables that still carry the old role
-    // column / enum. Idempotent — does nothing on a fresh install.
+    // Migrate existing hotel_users tables in place. Idempotent — does
+    // nothing on a fresh install.
     // ----------------------------------------------------------------
     await queryRunner.query(`
-      DROP INDEX IF EXISTS idx_hotel_users_hotel_role;
-    `);
-    await queryRunner.query(`
-      ALTER TABLE hotel_users DROP COLUMN IF EXISTS role;
-    `);
-    await queryRunner.query(`
       DROP TYPE IF EXISTS hotel_user_role;
+    `);
+    await queryRunner.query(`
+      ALTER TABLE hotel_users
+        ADD COLUMN IF NOT EXISTS role hotel_staff_role NOT NULL DEFAULT 'hotel_admin',
+        ADD COLUMN IF NOT EXISTS roles hotel_staff_role[] NOT NULL DEFAULT '{hotel_admin}'::hotel_staff_role[];
+    `);
+    await queryRunner.query(`
+      UPDATE hotel_users
+      SET roles = ARRAY[role]::hotel_staff_role[]
+      WHERE roles IS NULL OR cardinality(roles) = 0;
     `);
 
     // Services
@@ -449,11 +493,13 @@ async function seed() {
         id BIGSERIAL PRIMARY KEY,
         hotel_id BIGINT NOT NULL,
         service_id BIGINT,
+        order_code VARCHAR(30) UNIQUE,
+        idempotency_key VARCHAR(80),
         room_number VARCHAR(50),
         customer_name VARCHAR(120),
         customer_phone VARCHAR(50),
         note TEXT,
-        status food_order_status NOT NULL DEFAULT 'PENDING',
+        status VARCHAR(20) NOT NULL DEFAULT 'new',
         total_amount DECIMAL(12,2) NOT NULL DEFAULT 0
           CONSTRAINT ck_food_orders_total_amount_nonnegative CHECK (total_amount >= 0),
         rejected_reason TEXT,

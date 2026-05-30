@@ -20,35 +20,49 @@ export function StatsPanel({ stats, analytics, onOpenOrders }: StatsPanelProps) 
     {
       label: 'Chờ xử lý',
       value: stats.pending_orders,
-      filter: 'PENDING',
+      filter: 'new',
       className: 'text-amber-800 bg-amber-50',
       barClassName: 'bg-amber-500',
     },
     {
       label: 'Đã chấp nhận',
       value: stats.accepted_orders,
-      filter: 'ACCEPTED',
+      filter: 'accepted',
       className: 'text-blue-800 bg-blue-50',
       barClassName: 'bg-blue-500',
     },
     {
+      label: 'Đang chuẩn bị',
+      value: stats.preparing_orders,
+      filter: 'preparing',
+      className: 'text-indigo-800 bg-indigo-50',
+      barClassName: 'bg-indigo-500',
+    },
+    {
+      label: 'Đang giao',
+      value: stats.delivering_orders,
+      filter: 'delivering',
+      className: 'text-cyan-800 bg-cyan-50',
+      barClassName: 'bg-cyan-500',
+    },
+    {
       label: 'Hoàn thành',
       value: stats.completed_orders,
-      filter: 'COMPLETED',
+      filter: 'completed',
       className: 'text-emerald-800 bg-emerald-50',
       barClassName: 'bg-emerald-500',
     },
     {
       label: 'Đã từ chối',
       value: stats.rejected_orders,
-      filter: 'REJECTED',
+      filter: 'rejected',
       className: 'text-red-800 bg-red-50',
       barClassName: 'bg-red-500',
     },
     {
       label: 'Đã huỷ',
       value: stats.cancelled_orders,
-      filter: 'CANCELLED',
+      filter: 'cancelled',
       className: 'text-gray-700 bg-gray-100',
       barClassName: 'bg-gray-400',
     },
@@ -60,7 +74,8 @@ export function StatsPanel({ stats, analytics, onOpenOrders }: StatsPanelProps) 
     stats.total_orders > 0
       ? ((stats.rejected_orders + stats.cancelled_orders) / stats.total_orders) * 100
       : 0
-  const activeOrders = stats.pending_orders + stats.accepted_orders
+  const activeOrders =
+    stats.pending_orders + stats.accepted_orders + stats.preparing_orders + stats.delivering_orders
   const avgOrderValue = stats.total_orders > 0 ? stats.total_revenue / stats.total_orders : 0
   const todayRevenueShare =
     stats.total_revenue > 0 ? Math.min(100, (stats.revenue_today / stats.total_revenue) * 100) : 0
@@ -83,7 +98,7 @@ export function StatsPanel({ stats, analytics, onOpenOrders }: StatsPanelProps) 
       label: 'Đang xử lý',
       value: String(activeOrders),
       hint: `${stats.pending_orders} chờ, ${stats.accepted_orders} đã nhận`,
-      filter: 'PENDING',
+      filter: 'new',
       accent: 'bg-amber-500 text-white',
     },
     {
@@ -97,14 +112,14 @@ export function StatsPanel({ stats, analytics, onOpenOrders }: StatsPanelProps) 
       label: 'Hoàn thành',
       value: String(stats.completed_orders),
       hint: `${completionRate.toFixed(0)}% tổng số đơn`,
-      filter: 'COMPLETED',
+      filter: 'completed',
       accent: 'bg-emerald-600 text-white',
     },
     {
       label: 'Doanh thu ghi nhận',
       value: formatVnd(stats.total_revenue),
       hint: 'Từ đơn đã chấp nhận / hoàn thành',
-      filter: 'ACCEPTED',
+      filter: 'accepted',
       accent: 'bg-cyan-700 text-white',
     },
     {
@@ -164,7 +179,7 @@ export function StatsPanel({ stats, analytics, onOpenOrders }: StatsPanelProps) 
               <div className="grid grid-cols-2 gap-2 sm:w-64">
                 <button
                   type="button"
-                  onClick={() => onOpenOrders('PENDING')}
+                  onClick={() => onOpenOrders('new')}
                   className="rounded-xl bg-white text-[#18201b] px-3 py-3 text-left cursor-pointer hover:bg-sky-50 transition-colors"
                 >
                   <span className="block text-[11px] font-semibold text-text-light">Chờ xử lý</span>
@@ -172,7 +187,7 @@ export function StatsPanel({ stats, analytics, onOpenOrders }: StatsPanelProps) 
                 </button>
                 <button
                   type="button"
-                  onClick={() => onOpenOrders('ACCEPTED')}
+                  onClick={() => onOpenOrders('accepted')}
                   className="rounded-xl bg-white/10 border border-white/15 px-3 py-3 text-left cursor-pointer hover:bg-white/15 transition-colors"
                 >
                   <span className="block text-[11px] font-semibold text-white/65">Đã nhận</span>

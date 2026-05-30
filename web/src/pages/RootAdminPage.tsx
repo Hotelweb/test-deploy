@@ -5,6 +5,7 @@ import type { CreateHotelResponse, Hotel, HotelUser } from '../api'
 import { AddHotelModal } from '../components/AddHotelModal'
 import { EditHotelModal } from '../components/EditHotelModal'
 import { UserMenu } from '../components/UserMenu'
+import { useInternalChatNotifications } from '../hooks/useInternalChatNotifications'
 import {
   ChatIcon,
   CloseIcon,
@@ -35,6 +36,7 @@ export function RootAdminPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [newToast, setNewToast] = useState<NewHotelToast | null>(null)
+  const internalNotifications = useInternalChatNotifications()
 
   // -------------------------------------------------------------------------
   // Data loading
@@ -139,7 +141,7 @@ export function RootAdminPage() {
     <div className="min-h-screen bg-background-warm">
       {/* Header */}
       <header className="glass-nav sticky top-0 z-30 px-4 sm:px-8 lg:px-16 xl:px-20 py-5">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div className="max-w-[88rem] mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h1
               className="text-2xl sm:text-3xl font-bold text-text tracking-tight"
@@ -165,7 +167,7 @@ export function RootAdminPage() {
       </header>
 
       <main className="px-4 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10">
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        <div className="max-w-[88rem] mx-auto flex flex-col gap-6">
           {/* Stats + search */}
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex items-center gap-2 text-[13.5px] text-text-muted">
@@ -216,7 +218,9 @@ export function RootAdminPage() {
                   onOpenDashboard={() => navigate(`/admin/${hotel.id}`)}
                   onOpenServices={() => navigate(`/admin/${hotel.id}/services`)}
                   onOpenUserDashboard={() => navigate(`/admin/${hotel.id}`)}
+                  onOpenInternalChat={() => navigate(`/admin/${hotel.id}/internal-chat`)}
                   onDelete={() => handleDelete(hotel)}
+                  internalUnread={internalNotifications.unreadByHotel[hotel.id] ?? 0}
                 />
               ))}
             </div>
@@ -261,7 +265,9 @@ interface HotelAdminCardProps {
   onOpenDashboard: () => void
   onOpenServices: () => void
   onOpenUserDashboard: (user: HotelUser) => void
+  onOpenInternalChat: () => void
   onDelete: () => void
+  internalUnread: number
 }
 
 function HotelAdminCard({
@@ -273,12 +279,19 @@ function HotelAdminCard({
   onOpenDashboard,
   onOpenServices,
   onOpenUserDashboard,
+  onOpenInternalChat,
   onDelete,
+  internalUnread,
 }: HotelAdminCardProps) {
   const admins = users.filter((u) => u.is_active)
 
   return (
-    <article className="glass-card glass-card-hover rounded-2xl p-5 flex flex-col gap-4">
+    <article className="relative glass-card glass-card-hover rounded-2xl p-5 flex flex-col gap-4">
+      {internalUnread > 0 ? (
+        <span className="absolute right-14 top-4 min-w-6 h-6 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center shadow-soft">
+          {internalUnread > 99 ? '99+' : internalUnread}
+        </span>
+      ) : null}
       {/* Top: identity + delete */}
       <div className="flex items-start gap-3">
         <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-primary flex-shrink-0 overflow-hidden">
@@ -327,6 +340,18 @@ function HotelAdminCard({
         >
           <ServicesIcon className="w-4 h-4" />
           Quản lý dịch vụ
+        </button>
+        <button
+          onClick={onOpenInternalChat}
+          className="relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-medium text-text bg-white border border-border hover:border-teal-300 hover:bg-teal-50/60 cursor-pointer transition-all"
+        >
+          <UserCircleIcon className="w-4 h-4" />
+          Chat nội bộ
+          {internalUnread > 0 ? (
+            <span className="ml-0.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+              {internalUnread > 99 ? '99+' : internalUnread}
+            </span>
+          ) : null}
         </button>
         <button
           onClick={onEdit}

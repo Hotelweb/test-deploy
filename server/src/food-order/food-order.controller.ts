@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -28,18 +27,13 @@ import { CreateMenuItemDto } from './dto/create-menu-item.dto.js';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto.js';
 import { CreateFoodOrderDto } from './dto/create-food-order.dto.js';
 import { UpdateFoodOrderStatusDto } from './dto/update-food-order-status.dto.js';
+import { AssignFoodOrderDto } from './dto/assign-food-order.dto.js';
 import type { FoodOrderStatus } from './entities/food-order.entity.js';
 import { PaginationQueryDto } from '../common/pagination/pagination.dto.js';
 import { ChatGateway } from '../chat/chat.gateway.js';
-
-function assertHotelAccess(user: TokenPayload, hotelId: number) {
-  if (user.scope === 'system') return;
-  if (user.hotel_id !== hotelId) {
-    throw new ForbiddenException(
-      'Cannot access resources from a different hotel',
-    );
-  }
-}
+import { assertHotelAccess } from '../auth/hotel-access.js';
+import { assertPermission } from '../auth/permissions.js';
+import { AuditLogService } from '../audit-log/audit-log.service.js';
 
 @ApiTags('food-order')
 @Controller('food-order')
@@ -47,6 +41,7 @@ export class FoodOrderController {
   constructor(
     private readonly foodOrderService: FoodOrderService,
     private readonly chatGateway: ChatGateway,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -67,8 +62,10 @@ export class FoodOrderController {
   @Post('orders')
   @ApiOperation({ summary: 'Place a food/drink order (guest)' })
   @ApiResponse({ status: 201, description: 'Order created' })
-  createOrder(@Body() dto: CreateFoodOrderDto) {
-    return this.foodOrderService.createOrder(dto);
+  async createOrder(@Body() dto: CreateFoodOrderDto) {
+    const order = await this.foodOrderService.createOrder(dto);
+    this.chatGateway.emitOrderCreated(order);
+    return order;
   }
 
   @Get('orders/:id')
@@ -89,6 +86,7 @@ export class FoodOrderController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, hotelId);
+    assertPermission(user, 'services:manage');
     return this.foodOrderService.getMenuForAdmin(hotelId);
   }
 
@@ -100,6 +98,7 @@ export class FoodOrderController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, dto.hotel_id);
+    assertPermission(user, 'services:manage');
     return this.foodOrderService.createMenuItem(dto);
   }
 
@@ -113,6 +112,7 @@ export class FoodOrderController {
   ) {
     const item = await this.foodOrderService.findMenuItem(id);
     assertHotelAccess(user, Number(item.hotel_id));
+    assertPermission(user, 'services:manage');
     return this.foodOrderService.updateMenuItem(id, dto);
   }
 
@@ -126,6 +126,7 @@ export class FoodOrderController {
   ) {
     const item = await this.foodOrderService.findMenuItem(id);
     assertHotelAccess(user, Number(item.hotel_id));
+    assertPermission(user, 'services:manage');
     return this.foodOrderService.deleteMenuItem(id);
   }
 
@@ -141,6 +142,7 @@ export class FoodOrderController {
     @CurrentUser() user?: TokenPayload,
   ) {
     assertHotelAccess(user!, hotelId);
+    assertPermission(user!, 'orders:view');
     return this.foodOrderService.getOrdersForAdmin(hotelId, pagination, status);
   }
 
@@ -154,7 +156,40 @@ export class FoodOrderController {
   ) {
     const order = await this.foodOrderService.getOrder(id);
     assertHotelAccess(user, order.hotel_id);
-    const updated = await this.foodOrderService.updateOrderStatus(id, dto);
+    assertPermission(user, 'orders:update');
+    const updated = await this.foodOrderService.updateOrderStatus(id, dto, user.sub);
+    void this.auditLog.record({
+      actor: user,
+      hotelId: order.hotel_id,
+      action: 'order.status_changed',
+      targetType: 'food_order',
+      targetId: id,
+      metadata: { from: order.status, to: dto.status },
+    });
+    this.chatGateway.emitOrderStatusChanged(updated);
+    return updated;
+  }
+
+  @Patch('admin/orders/:id/assignment')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async assignOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AssignFoodOrderDto,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    const order = await this.foodOrderService.getOrder(id);
+    assertHotelAccess(user, order.hotel_id);
+    assertPermission(user, 'orders:update');
+    const updated = await this.foodOrderService.assignOrder(id, dto);
+    void this.auditLog.record({
+      actor: user,
+      hotelId: order.hotel_id,
+      action: 'order.assigned',
+      targetType: 'food_order',
+      targetId: id,
+      metadata: dto as Record<string, unknown>,
+    });
     this.chatGateway.emitOrderStatusChanged(updated);
     return updated;
   }
@@ -167,6 +202,7 @@ export class FoodOrderController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, hotelId);
+    assertPermission(user, 'reports:view');
     return this.foodOrderService.getStats(hotelId);
   }
 
@@ -183,6 +219,7 @@ export class FoodOrderController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, hotelId);
+    assertPermission(user, 'reports:view');
     return this.foodOrderService.getAnalytics(hotelId);
   }
 
@@ -194,6 +231,7 @@ export class FoodOrderController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, hotelId);
+    assertPermission(user, 'orders:view');
     return this.foodOrderService.countPending(hotelId);
   }
 }

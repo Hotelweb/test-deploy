@@ -10,13 +10,26 @@ import {
 import { Logger, UnauthorizedException } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service.js';
-import { ChatSessionStatus } from './entities/chat.entity.js';
+import {
+  ChatSessionStatus,
+  MessageSenderType,
+  MessageType,
+} from './entities/chat.entity.js';
 import { TokenService, type TokenPayload } from '../auth/token.service.js';
 import { assertHotelAccess } from '../auth/hotel-access.js';
 import type { FoodOrderView } from '../food-order/food-order.service.js';
+import type { InternalChatMessage } from './entities/internal-chat.entity.js';
+import type { InternalConversationSummary } from './internal-chat.service.js';
+import {
+  chatSocketRoom,
+  ChatSocketClientEvent,
+  ChatReadActor,
+  ChatSocketRole,
+  ChatSocketServerEvent,
+} from './socket-events.js';
 
 interface SocketData {
-  role?: 'customer' | 'staff';
+  role?: ChatSocketRole;
   user?: TokenPayload;
 }
 
@@ -71,54 +84,85 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Rooms
   // ---------------------------------------------------------------------------
 
-  @SubscribeMessage('joinSession')
-  handleJoinSession(
+  @SubscribeMessage(ChatSocketClientEvent.JoinSession)
+  async handleJoinSession(
     @ConnectedSocket() client: TypedSocket,
-    @MessageBody() data: { sessionId: number; role?: 'customer' | 'staff' },
+    @MessageBody() data: { sessionId: number; role?: ChatSocketRole },
   ) {
-    const room = `session_${data.sessionId}`;
+    if (data.role === ChatSocketRole.Staff) {
+      const user = this.requireStaff(client);
+      const session = await this.chatService.getSession(data.sessionId);
+      assertHotelAccess(user, Number(session.hotel_id));
+    }
+
+    const room = chatSocketRoom.session(data.sessionId);
     void client.join(room);
     if (data.role) client.data.role = data.role;
-    return { event: 'joinedSession', data: { sessionId: data.sessionId } };
+    return {
+      event: ChatSocketServerEvent.JoinedSession,
+      data: { sessionId: data.sessionId },
+    };
   }
 
-  @SubscribeMessage('leaveSession')
+  @SubscribeMessage(ChatSocketClientEvent.LeaveSession)
   handleLeaveSession(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { sessionId: number },
   ) {
-    const room = `session_${data.sessionId}`;
+    const room = chatSocketRoom.session(data.sessionId);
     void client.leave(room);
-    return { event: 'leftSession', data: { sessionId: data.sessionId } };
+    return {
+      event: ChatSocketServerEvent.LeftSession,
+      data: { sessionId: data.sessionId },
+    };
   }
 
-  @SubscribeMessage('joinHotel')
+  @SubscribeMessage(ChatSocketClientEvent.JoinHotel)
   handleJoinHotel(
     @ConnectedSocket() client: TypedSocket,
     @MessageBody() data: { hotelId: number },
   ) {
     const user = this.requireStaff(client);
     assertHotelAccess(user, data.hotelId);
-    const room = `hotel_${data.hotelId}`;
+    const room = chatSocketRoom.hotel(data.hotelId);
     void client.join(room);
-    return { event: 'joinedHotel', data: { hotelId: data.hotelId } };
+    return {
+      event: ChatSocketServerEvent.JoinedHotel,
+      data: { hotelId: data.hotelId },
+    };
   }
 
-  @SubscribeMessage('joinOrder')
+  @SubscribeMessage(ChatSocketClientEvent.JoinOrder)
   handleJoinOrder(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: number },
   ) {
-    const room = `order_${data.orderId}`;
+    const room = chatSocketRoom.order(data.orderId);
     void client.join(room);
-    return { event: 'joinedOrder', data: { orderId: data.orderId } };
+    return {
+      event: ChatSocketServerEvent.JoinedOrder,
+      data: { orderId: data.orderId },
+    };
+  }
+
+  @SubscribeMessage(ChatSocketClientEvent.JoinSystem)
+  handleJoinSystem(@ConnectedSocket() client: TypedSocket) {
+    const user = this.requireStaff(client);
+    if (user.scope !== 'system') {
+      throw new UnauthorizedException('System admin authentication required');
+    }
+    void client.join(chatSocketRoom.system());
+    return {
+      event: ChatSocketServerEvent.JoinedSystem,
+      data: {},
+    };
   }
 
   // ---------------------------------------------------------------------------
   // Messaging
   // ---------------------------------------------------------------------------
 
-  @SubscribeMessage('sendMessage')
+  @SubscribeMessage(ChatSocketClientEvent.SendMessage)
   async handleSendMessage(
     @ConnectedSocket() client: TypedSocket,
     @MessageBody()
@@ -126,15 +170,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       sessionId: number;
       message: string;
       source_language: string;
-      sender_type: 'CUSTOMER' | 'STAFF';
+      sender_type: MessageSenderType;
       sender_user_id?: number;
       client_message_id?: string;
-      message_type?: 'TEXT' | 'IMAGE';
+      message_type?: MessageType.TEXT | MessageType.IMAGE;
       image_url?: string;
     },
   ) {
     const savedMessage =
-      data.sender_type === 'CUSTOMER'
+      data.sender_type === MessageSenderType.CUSTOMER
         ? await this.chatService.sendCustomerMessage(data.sessionId, {
             message: data.message,
             source_language: data.source_language,
@@ -144,17 +188,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           })
         : await this.sendStaffMessage(client, data);
 
-    const room = `session_${data.sessionId}`;
-    this.server.to(room).emit('newMessage', savedMessage);
+    const room = chatSocketRoom.session(data.sessionId);
+    this.server.to(room).emit(ChatSocketServerEvent.NewMessage, savedMessage);
 
     const session = await this.chatService.getSession(data.sessionId);
-    this.server.to(`hotel_${session.hotel_id}`).emit('sessionUpdate', {
-      sessionId: data.sessionId,
-      message: savedMessage,
-      session,
-    });
+    this.server
+      .to(chatSocketRoom.hotel(Number(session.hotel_id)))
+      .emit(ChatSocketServerEvent.SessionUpdate, {
+        sessionId: data.sessionId,
+        message: savedMessage,
+        session,
+      });
 
-    return { event: 'messageSent', data: savedMessage };
+    return { event: ChatSocketServerEvent.MessageSent, data: savedMessage };
   }
 
   private async sendStaffMessage(
@@ -164,7 +210,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       message: string;
       source_language: string;
       client_message_id?: string;
-      message_type?: 'TEXT' | 'IMAGE';
+      message_type?: MessageType.TEXT | MessageType.IMAGE;
       image_url?: string;
     },
   ) {
@@ -184,18 +230,24 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Typing
   // ---------------------------------------------------------------------------
 
-  @SubscribeMessage('typing')
-  handleTyping(
-    @ConnectedSocket() client: Socket,
+  @SubscribeMessage(ChatSocketClientEvent.Typing)
+  async handleTyping(
+    @ConnectedSocket() client: TypedSocket,
     @MessageBody()
     data: {
       sessionId: number;
-      sender_type: 'CUSTOMER' | 'STAFF';
+      sender_type: MessageSenderType;
       isTyping: boolean;
     },
   ) {
-    const room = `session_${data.sessionId}`;
-    client.to(room).emit('typing', {
+    if (data.sender_type === MessageSenderType.STAFF) {
+      const user = this.requireStaff(client);
+      const session = await this.chatService.getSession(data.sessionId);
+      assertHotelAccess(user, Number(session.hotel_id));
+    }
+
+    const room = chatSocketRoom.session(data.sessionId);
+    (client as Socket).to(room).emit(ChatSocketServerEvent.Typing, {
       sessionId: data.sessionId,
       sender_type: data.sender_type,
       isTyping: data.isTyping,
@@ -206,13 +258,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Read receipts
   // ---------------------------------------------------------------------------
 
-  @SubscribeMessage('markRead')
+  @SubscribeMessage(ChatSocketClientEvent.MarkRead)
   async handleMarkRead(
     @ConnectedSocket() client: TypedSocket,
     @MessageBody()
-    data: { sessionId: number; by: 'customer' | 'staff' },
+    data: { sessionId: number; by: ChatReadActor },
   ) {
-    if (data.by === 'staff') {
+    if (data.by === ChatReadActor.Staff) {
       const user = this.requireStaff(client);
       const session = await this.chatService.getSession(data.sessionId);
       assertHotelAccess(user, Number(session.hotel_id));
@@ -222,27 +274,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data.sessionId,
       data.by,
     );
-    const room = `session_${data.sessionId}`;
-    this.server.to(room).emit('messagesRead', {
+    const room = chatSocketRoom.session(data.sessionId);
+    this.server.to(room).emit(ChatSocketServerEvent.MessagesRead, {
       sessionId: data.sessionId,
       by: data.by,
       updated: result.updated,
     });
 
     const session = await this.chatService.getSession(data.sessionId);
-    this.server.to(`hotel_${session.hotel_id}`).emit('sessionUnreadUpdate', {
-      sessionId: data.sessionId,
-      unread_count: session.unread_count,
-    });
+    this.server
+      .to(chatSocketRoom.hotel(Number(session.hotel_id)))
+      .emit(ChatSocketServerEvent.SessionUnreadUpdate, {
+        sessionId: data.sessionId,
+        unread_count: session.unread_count,
+      });
 
-    return { event: 'markedRead', data: result };
+    return { event: ChatSocketServerEvent.MarkedRead, data: result };
   }
 
   // ---------------------------------------------------------------------------
   // Session status
   // ---------------------------------------------------------------------------
 
-  @SubscribeMessage('updateSessionStatus')
+  @SubscribeMessage(ChatSocketClientEvent.UpdateSessionStatus)
   async handleUpdateStatus(
     @ConnectedSocket() client: TypedSocket,
     @MessageBody() data: { sessionId: number; status: ChatSessionStatus },
@@ -256,21 +310,67 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data.status,
     );
     this.server
-      .to(`hotel_${session.hotel_id}`)
-      .emit('sessionStatusChanged', { sessionId: data.sessionId, session });
+      .to(chatSocketRoom.hotel(Number(session.hotel_id)))
+      .emit(ChatSocketServerEvent.SessionStatusChanged, {
+        sessionId: data.sessionId,
+        session,
+      });
     this.server
-      .to(`session_${data.sessionId}`)
-      .emit('sessionStatusChanged', { sessionId: data.sessionId, session });
+      .to(chatSocketRoom.session(data.sessionId))
+      .emit(ChatSocketServerEvent.SessionStatusChanged, {
+        sessionId: data.sessionId,
+        session,
+      });
   }
 
   emitOrderStatusChanged(order: FoodOrderView) {
-    this.server.to(`order_${order.id}`).emit('orderStatusChanged', {
-      orderId: order.id,
-      order,
-    });
-    this.server.to(`hotel_${order.hotel_id}`).emit('orderStatusChanged', {
-      orderId: order.id,
-      order,
-    });
+    this.server
+      .to(chatSocketRoom.order(order.id))
+      .emit(ChatSocketServerEvent.OrderStatusChanged, {
+        orderId: order.id,
+        order,
+      });
+    this.server
+      .to(chatSocketRoom.hotel(order.hotel_id))
+      .emit(ChatSocketServerEvent.OrderStatusChanged, {
+        orderId: order.id,
+        order,
+      });
+  }
+
+  emitOrderCreated(order: FoodOrderView) {
+    this.server
+      .to(chatSocketRoom.hotel(order.hotel_id))
+      .emit(ChatSocketServerEvent.OrderCreated, {
+        orderId: order.id,
+        order,
+      });
+  }
+
+  emitInternalMessage(
+    hotelId: number,
+    data: {
+      conversation: InternalConversationSummary;
+      message: InternalChatMessage;
+    },
+  ) {
+    this.server
+      .to(chatSocketRoom.hotel(hotelId))
+      .emit(ChatSocketServerEvent.InternalMessage, data);
+    this.server
+      .to(chatSocketRoom.system())
+      .emit(ChatSocketServerEvent.InternalMessage, data);
+  }
+
+  emitInternalConversationRead(
+    hotelId: number,
+    conversation: InternalConversationSummary,
+  ) {
+    this.server
+      .to(chatSocketRoom.hotel(hotelId))
+      .emit(ChatSocketServerEvent.InternalConversationRead, { conversation });
+    this.server
+      .to(chatSocketRoom.system())
+      .emit(ChatSocketServerEvent.InternalConversationRead, { conversation });
   }
 }

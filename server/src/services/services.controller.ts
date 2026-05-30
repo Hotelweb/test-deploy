@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -26,24 +25,17 @@ import { CreateServiceDto } from './dto/create-service.dto.js';
 import { UpdateServiceDto } from './dto/update-service.dto.js';
 import { CurrentUser, JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { TokenPayload } from '../auth/token.service.js';
-
-/**
- * System admins have full access. Hotel users only see / mutate services
- * for the hotel their token is bound to.
- */
-function assertHotelAccess(user: TokenPayload, hotelId: number) {
-  if (user.scope === 'system') return;
-  if (user.hotel_id !== hotelId) {
-    throw new ForbiddenException(
-      'Cannot access services from a different hotel',
-    );
-  }
-}
+import { assertHotelAccess } from '../auth/hotel-access.js';
+import { assertPermission } from '../auth/permissions.js';
+import { AuditLogService } from '../audit-log/audit-log.service.js';
 
 @ApiTags('services')
 @Controller('services')
 export class ServicesController {
-  constructor(private readonly servicesService: ServicesService) {}
+  constructor(
+    private readonly servicesService: ServicesService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   // ----------------------------------------------------------------------
   // Public — used by the customer-facing hotel detail page
@@ -110,6 +102,7 @@ export class ServicesController {
     @CurrentUser() user: TokenPayload,
   ) {
     assertHotelAccess(user, hotelId);
+    assertPermission(user, 'services:manage');
     return this.servicesService.findByHotelForAdmin(hotelId);
   }
 
@@ -125,9 +118,18 @@ export class ServicesController {
   @ApiResponse({ status: 201, description: 'Service created' })
   @ApiResponse({ status: 401, description: 'Missing or invalid token' })
   @ApiResponse({ status: 403, description: 'Cross-hotel access denied' })
-  create(@Body() dto: CreateServiceDto, @CurrentUser() user: TokenPayload) {
+  async create(@Body() dto: CreateServiceDto, @CurrentUser() user: TokenPayload) {
     assertHotelAccess(user, dto.hotel_id);
-    return this.servicesService.create(dto);
+    assertPermission(user, 'services:manage');
+    const created = await this.servicesService.create(dto);
+    void this.auditLog.record({
+      actor: user,
+      hotelId: dto.hotel_id,
+      action: 'service.created',
+      targetType: 'service',
+      targetId: Number(created.id),
+    });
+    return created;
   }
 
   @Patch(':id')
@@ -149,7 +151,16 @@ export class ServicesController {
   ) {
     const target = await this.servicesService.findOne(id);
     assertHotelAccess(user, Number(target.hotel_id));
-    return this.servicesService.update(id, dto);
+    assertPermission(user, 'services:manage');
+    const updated = await this.servicesService.update(id, dto);
+    void this.auditLog.record({
+      actor: user,
+      hotelId: Number(target.hotel_id),
+      action: 'service.updated',
+      targetType: 'service',
+      targetId: id,
+    });
+    return updated;
   }
 
   @Delete(':id')
@@ -171,6 +182,14 @@ export class ServicesController {
   ) {
     const target = await this.servicesService.findOne(id);
     assertHotelAccess(user, Number(target.hotel_id));
-    return this.servicesService.softDelete(id);
+    assertPermission(user, 'services:manage');
+    await this.servicesService.softDelete(id);
+    void this.auditLog.record({
+      actor: user,
+      hotelId: Number(target.hotel_id),
+      action: 'service.deleted',
+      targetType: 'service',
+      targetId: id,
+    });
   }
 }

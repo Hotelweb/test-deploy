@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -28,6 +29,7 @@ import {
 } from '../auth/jwt-auth.guard.js';
 import type { TokenPayload } from '../auth/token.service.js';
 import { ForbiddenException } from '@nestjs/common';
+import { assertPermission } from '../auth/permissions.js';
 
 @ApiTags('hotels')
 @Controller('hotels')
@@ -84,8 +86,13 @@ export class HotelsController {
   })
   @ApiResponse({ status: 200, description: 'Hotel found' })
   @ApiResponse({ status: 404, description: 'Hotel not found or inactive' })
-  findByQr(@Param('qrToken') qrToken: string) {
-    return this.hotelsService.findByQrToken(qrToken);
+  async findByQr(
+    @Param('qrToken') qrToken: string,
+    @Query('room') roomToken?: string,
+  ) {
+    const hotel = await this.hotelsService.findByQrToken(qrToken);
+    await this.hotelsService.trackQrOpen(hotel.id, 'qr', roomToken);
+    return hotel;
   }
 
   @Get('slug/:slug')
@@ -99,8 +106,13 @@ export class HotelsController {
   })
   @ApiResponse({ status: 200, description: 'Hotel found' })
   @ApiResponse({ status: 404, description: 'Hotel not found or inactive' })
-  findBySlug(@Param('slug') slug: string) {
-    return this.hotelsService.findBySlug(slug);
+  async findBySlug(
+    @Param('slug') slug: string,
+    @Query('room') roomToken?: string,
+  ) {
+    const hotel = await this.hotelsService.findBySlug(slug);
+    await this.hotelsService.trackQrOpen(hotel.id, 'slug', roomToken);
+    return hotel;
   }
 
   @Get(':id')
@@ -149,6 +161,7 @@ export class HotelsController {
     if (user.scope === 'hotel' && user.hotel_id !== id) {
       throw new ForbiddenException('You can only update your own hotel');
     }
+    assertPermission(user, 'hotel:manage');
     return this.hotelsService.update(id, dto);
   }
 
@@ -176,6 +189,7 @@ export class HotelsController {
     if (user.scope === 'hotel' && user.hotel_id !== id) {
       throw new ForbiddenException('You can only regenerate your own hotel QR');
     }
+    assertPermission(user, 'hotel:manage');
     return this.hotelsService.regenerateQrToken(id);
   }
 

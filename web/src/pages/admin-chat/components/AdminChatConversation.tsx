@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { ChatSession } from '../../../api'
+import type { ChatSession, HotelUser } from '../../../api'
 import { CannedResponses } from '../../../components/messages/CannedResponses'
 import { ConnectionBanner, ConnectionDot } from '../../../components/messages/ConnectionBanner'
 import { GuestInfoPanel } from '../../../components/messages/GuestInfoPanel'
@@ -9,20 +9,18 @@ import { TypingIndicator } from '../../../components/messages/TypingIndicator'
 import type { ConnectionState } from '../../../hooks/useChatSocket'
 import {
   ImageIcon,
-  MoreIcon,
   PaperclipIcon,
-  PhoneIcon,
   SendIcon,
-  SmileIcon,
   TranslateBubbleIcon,
-  VideoIcon,
 } from '../../../components/icons/ServiceIcons'
 import { getLanguage } from '../../../lib/languages'
+import { ChatSocketRole } from '../../../lib/socketEvents'
 import { Avatar } from './Avatar'
 import { DateDivider } from './DateDivider'
 
 type AdminChatConversationProps = {
   session: ChatSession
+  staff: HotelUser[]
   connection: ConnectionState
   showOriginal: boolean
   onShowOriginalToggle: () => void
@@ -39,11 +37,14 @@ type AdminChatConversationProps = {
   onAttachClick: () => void
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onRetry: (msg: DisplayMessage) => void
+  onAssignSession: (staffId: number | null) => void
+  onResolveSession: () => void
   onBackToList?: () => void
 }
 
 export function AdminChatConversation({
   session,
+  staff,
   connection,
   showOriginal,
   onShowOriginalToggle,
@@ -60,6 +61,8 @@ export function AdminChatConversation({
   onAttachClick,
   onFileChange,
   onRetry,
+  onAssignSession,
+  onResolveSession,
   onBackToList,
 }: AdminChatConversationProps) {
   const guestName = session.customer_name || `Khách #${session.id}`
@@ -110,6 +113,30 @@ export function AdminChatConversation({
           </div>
 
           <div className="flex items-center gap-1 text-text-muted flex-shrink-0">
+            <select
+              value={session.assigned_user_id ?? ''}
+              onChange={(event) =>
+                onAssignSession(event.target.value ? Number(event.target.value) : null)
+              }
+              className="hidden lg:block h-9 max-w-40 rounded-xl border border-border-light bg-white px-2 text-[12px] text-text-muted"
+              aria-label="Gán hội thoại"
+            >
+              <option value="">Customer Care</option>
+              {staff.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+            {session.status !== 'RESOLVED' && session.status !== 'CLOSED' ? (
+              <button
+                type="button"
+                onClick={onResolveSession}
+                className="hidden sm:flex h-9 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-[12px] font-bold items-center"
+              >
+                Resolve
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onShowOriginalToggle}
@@ -124,24 +151,6 @@ export function AdminChatConversation({
               <span className="hidden sm:inline">
                 {showOriginal ? 'Ẩn bản gốc' : 'Xem bản gốc'}
               </span>
-            </button>
-            <button
-              className="hidden sm:flex w-9 h-9 rounded-xl hover:bg-gray-100 items-center justify-center cursor-pointer"
-              aria-label="Gọi điện"
-            >
-              <PhoneIcon className="w-4 h-4" />
-            </button>
-            <button
-              className="hidden sm:flex w-9 h-9 rounded-xl hover:bg-gray-100 items-center justify-center cursor-pointer"
-              aria-label="Gọi video"
-            >
-              <VideoIcon className="w-4 h-4" />
-            </button>
-            <button
-              className="hidden sm:flex w-9 h-9 rounded-xl hover:bg-gray-100 items-center justify-center cursor-pointer"
-              aria-label="Tùy chọn"
-            >
-              <MoreIcon className="w-4 h-4" />
             </button>
           </div>
         </header>
@@ -163,7 +172,7 @@ export function AdminChatConversation({
             <MessageBubble
               key={`${msg.id}_${msg.client_message_id ?? ''}`}
               message={msg}
-              viewer="staff"
+              viewer={ChatSocketRole.Staff}
               showOriginal={showOriginal}
               labels={{
                 sending: 'Đang gửi',
@@ -232,15 +241,8 @@ export function AdminChatConversation({
                 onKeyDown={onKeyDown}
                 rows={1}
                 placeholder={`Nhập tin nhắn (sẽ tự dịch sang ${customerLang.nativeName})…`}
-                className="block w-full h-11 max-h-[140px] resize-none px-4 py-3 rounded-2xl bg-gray-50 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:bg-white border border-border-light focus:border-indigo-300 transition-all placeholder:text-text-lighter pr-10 overflow-y-auto"
+                className="block w-full h-11 max-h-[140px] resize-none px-4 py-3 rounded-2xl bg-gray-50 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:bg-white border border-border-light focus:border-indigo-300 transition-all placeholder:text-text-lighter overflow-y-auto"
               />
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center text-text-muted cursor-pointer transition-colors"
-                aria-label="Thêm emoji"
-              >
-                <SmileIcon className="w-4 h-4" />
-              </button>
             </div>
             <button
               type="button"

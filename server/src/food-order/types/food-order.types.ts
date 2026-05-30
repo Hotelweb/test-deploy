@@ -30,6 +30,7 @@ export interface FoodOrderView {
   id: number;
   hotel_id: number;
   service_id: number | null;
+  order_code: string | null;
   room_number: string | null;
   customer_name: string | null;
   customer_phone: string | null;
@@ -37,6 +38,11 @@ export interface FoodOrderView {
   status: FoodOrderStatus;
   total_amount: number;
   rejected_reason: string | null;
+  assigned_to_user_id: number | null;
+  assigned_group: string | null;
+  assigned_at: Date | null;
+  last_handled_by: number | null;
+  handled_at: Date | null;
   items: FoodOrderItemView[];
   created_at: Date;
   updated_at: Date;
@@ -46,6 +52,8 @@ export interface FoodOrderStats {
   total_orders: number;
   pending_orders: number;
   accepted_orders: number;
+  preparing_orders: number;
+  delivering_orders: number;
   rejected_orders: number;
   completed_orders: number;
   cancelled_orders: number;

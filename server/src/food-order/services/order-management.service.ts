@@ -12,6 +12,7 @@ import {
 } from '../../common/pagination/pagination.dto.js';
 import { CreateFoodOrderDto } from '../dto/create-food-order.dto.js';
 import { UpdateFoodOrderStatusDto } from '../dto/update-food-order-status.dto.js';
+import { AssignFoodOrderDto } from '../dto/assign-food-order.dto.js';
 import {
   FoodOrder,
   FoodOrderItem,
@@ -32,6 +33,23 @@ export class OrderManagementService {
   ) {}
 
   async createOrder(dto: CreateFoodOrderDto): Promise<FoodOrderView> {
+    if (!dto.room_number?.trim() && !dto.customer_phone?.trim()) {
+      throw new BadRequestException(
+        'Please provide at least a room number or phone number',
+      );
+    }
+
+    if (dto.idempotency_key?.trim()) {
+      const existing = await this.orderRepo.findOne({
+        where: {
+          hotel_id: dto.hotel_id,
+          idempotency_key: dto.idempotency_key.trim(),
+        },
+        relations: ['items'],
+      });
+      if (existing) return toOrderView(existing);
+    }
+
     const menuIds = [...new Set(dto.items.map((i) => i.menu_item_id))];
     const menuItems = await this.menuRepo.find({
       where: {
@@ -72,11 +90,13 @@ export class OrderManagementService {
       const order = manager.create(FoodOrder, {
         hotel_id: dto.hotel_id,
         service_id: dto.service_id ?? null,
-        room_number: dto.room_number ?? null,
+        order_code: await this.generateOrderCode(manager),
+        idempotency_key: dto.idempotency_key?.trim() || null,
+        room_number: dto.room_number?.trim() || null,
         customer_name: dto.customer_name ?? null,
-        customer_phone: dto.customer_phone ?? null,
+        customer_phone: dto.customer_phone?.trim() || null,
         note: dto.note ?? null,
-        status: 'PENDING',
+        status: 'new',
         total_amount: String(total),
       });
       const savedOrder = await manager.save(order);
@@ -126,21 +146,29 @@ export class OrderManagementService {
   async updateOrderStatus(
     id: number,
     dto: UpdateFoodOrderStatusDto,
+    handledBy?: number,
   ): Promise<FoodOrderView> {
     const order = await this.findOrder(id);
 
-    if (dto.status === 'REJECTED' && !dto.rejected_reason?.trim()) {
+    if (dto.status === 'rejected' && !dto.rejected_reason?.trim()) {
       throw new BadRequestException('Vui lòng nhập lý do từ chối đơn hàng');
     }
 
-    if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
-      throw new BadRequestException('Đơn hàng đã kết thúc, không thể thay đổi');
+    const nextStatuses = ALLOWED_STATUS_TRANSITIONS[order.status] ?? [];
+    if (!nextStatuses.includes(dto.status)) {
+      throw new BadRequestException(
+        `Invalid order status transition from ${order.status} to ${dto.status}`,
+      );
     }
 
     order.status = dto.status;
-    if (dto.status === 'REJECTED') {
+    if (handledBy) {
+      order.last_handled_by = handledBy;
+      order.handled_at = new Date();
+    }
+    if (dto.status === 'rejected') {
       order.rejected_reason = dto.rejected_reason?.trim() ?? null;
-    } else if (dto.status === 'ACCEPTED') {
+    } else if (dto.status === 'accepted') {
       order.rejected_reason = null;
     }
 
@@ -148,9 +176,21 @@ export class OrderManagementService {
     return toOrderView(saved);
   }
 
+  async assignOrder(
+    id: number,
+    dto: AssignFoodOrderDto,
+  ): Promise<FoodOrderView> {
+    const order = await this.findOrder(id);
+    order.assigned_to_user_id = dto.assigned_to_user_id ?? null;
+    order.assigned_group = dto.assigned_group?.trim() || null;
+    order.assigned_at = new Date();
+    const saved = await this.orderRepo.save(order);
+    return toOrderView(saved);
+  }
+
   async countPending(hotelId: number): Promise<number> {
     return this.orderRepo.count({
-      where: { hotel_id: hotelId, status: 'PENDING' },
+      where: { hotel_id: hotelId, status: 'new' },
     });
   }
 
@@ -162,4 +202,32 @@ export class OrderManagementService {
     if (!order) throw new NotFoundException(`Order #${id} not found`);
     return order;
   }
+
+  private async generateOrderCode(
+    manager: import('typeorm').EntityManager,
+  ): Promise<string> {
+    const prefix = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const random = Math.floor(1000 + Math.random() * 9000);
+      const code = `FB${prefix}${random}`;
+      const exists = await manager.exists(FoodOrder, {
+        where: { order_code: code },
+      });
+      if (!exists) return code;
+    }
+    return `FB${prefix}${Date.now().toString().slice(-6)}`;
+  }
 }
+
+export const ALLOWED_STATUS_TRANSITIONS: Record<
+  FoodOrderStatus,
+  FoodOrderStatus[]
+> = {
+  new: ['accepted', 'rejected', 'cancelled'],
+  accepted: ['preparing', 'cancelled'],
+  preparing: ['delivering', 'cancelled'],
+  delivering: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+  rejected: [],
+};

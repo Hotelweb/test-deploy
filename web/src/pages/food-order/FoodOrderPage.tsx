@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   createFoodOrder,
+  getFoodOrder,
   getHotelBySlug,
   getPublicMenu,
+  type FoodOrder,
   type Hotel,
   type MenuCategory,
   type MenuItem,
@@ -14,6 +16,7 @@ import {
   ensureGuestNotificationPermission,
   rememberGuestOrder,
 } from '../../hooks/useGuestFaviconNotifications'
+import { applyHotelTheme, resetHotelTheme } from '../../lib/theme'
 
 type CartLine = { item: MenuItem; quantity: number }
 
@@ -32,7 +35,7 @@ export function FoodOrderPage() {
   const [customerPhone, setCustomerPhone] = useState('')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [orderSuccess, setOrderSuccess] = useState<number | null>(null)
+  const [orderSuccess, setOrderSuccess] = useState<FoodOrder | null>(null)
 
   const apiLang = lang === 'VN' ? 'vi' : 'en'
 
@@ -44,6 +47,7 @@ export function FoodOrderPage() {
       try {
         setLoading(true)
         const h = await getHotelBySlug(slug!)
+        applyHotelTheme(h.theme_config)
         const items = await getPublicMenu(h.id, apiLang)
         if (!cancelled) {
           setHotel(h)
@@ -63,6 +67,12 @@ export function FoodOrderPage() {
       cancelled = true
     }
   }, [slug, apiLang])
+
+  useEffect(() => {
+    if (!hotel) return
+    applyHotelTheme(hotel.theme_config)
+    return () => resetHotelTheme()
+  }, [hotel])
 
   const filtered = useMemo(() => {
     if (category === 'all') return menu
@@ -100,8 +110,12 @@ export function FoodOrderPage() {
 
   const handleSubmit = async () => {
     if (!hotel || cart.length === 0) return
-    if (!roomNumber.trim()) {
-      window.alert(lang === 'VN' ? 'Vui lòng nhập số phòng' : 'Please enter your room number')
+    if (!roomNumber.trim() && !customerPhone.trim()) {
+      window.alert(
+        lang === 'VN'
+          ? 'Vui lòng nhập số phòng hoặc số điện thoại'
+          : 'Please enter your room number or phone number',
+      )
       return
     }
     void ensureGuestNotificationPermission()
@@ -113,11 +127,12 @@ export function FoodOrderPage() {
         room_number: roomNumber.trim(),
         customer_name: customerName.trim() || undefined,
         customer_phone: customerPhone.trim() || undefined,
+        idempotency_key: crypto.randomUUID(),
         note: note.trim() || undefined,
         items: cart.map((l) => ({ menu_item_id: l.item.id, quantity: l.quantity })),
       })
       rememberGuestOrder(order.id)
-      setOrderSuccess(order.id)
+      setOrderSuccess(order)
       setCart([])
       setCartOpen(false)
     } catch (err) {
@@ -158,7 +173,12 @@ export function FoodOrderPage() {
           onLangChange={setLang}
         />
         <main className="px-4 sm:px-8 py-12 max-w-lg mx-auto text-center">
-          <SuccessCard orderId={orderSuccess} lang={lang} slug={hotel.slug} />
+          <SuccessCard
+            order={orderSuccess}
+            lang={lang}
+            slug={hotel.slug}
+            onOrderChange={setOrderSuccess}
+          />
         </main>
       </div>
     )
@@ -402,7 +422,7 @@ function CartDrawer({
             <input
               value={roomNumber}
               onChange={(e) => onRoomChange(e.target.value)}
-              placeholder={lang === 'VN' ? 'Số phòng *' : 'Room number *'}
+              placeholder={lang === 'VN' ? 'Số phòng' : 'Room number'}
               className="w-full px-3 py-2.5 rounded-xl border border-border text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <input
@@ -452,14 +472,35 @@ function CartDrawer({
 }
 
 function SuccessCard({
-  orderId,
+  order,
   lang,
   slug,
+  onOrderChange,
 }: {
-  orderId: number
+  order: FoodOrder
   lang: 'VN' | 'EN'
   slug: string
+  onOrderChange: (order: FoodOrder) => void
 }) {
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void getFoodOrder(order.id)
+        .then(onOrderChange)
+        .catch(() => undefined)
+    }, 5000)
+    return () => window.clearInterval(id)
+  }, [onOrderChange, order.id])
+
+  const statusLabel: Record<FoodOrder['status'], string> = {
+    new: lang === 'VN' ? 'Đang chờ xác nhận' : 'Waiting for confirmation',
+    accepted: lang === 'VN' ? 'Đã nhận đơn' : 'Accepted',
+    preparing: lang === 'VN' ? 'Đang chuẩn bị' : 'Preparing',
+    delivering: lang === 'VN' ? 'Đang giao' : 'Delivering',
+    completed: lang === 'VN' ? 'Hoàn thành' : 'Completed',
+    cancelled: lang === 'VN' ? 'Đã huỷ' : 'Cancelled',
+    rejected: lang === 'VN' ? 'Đã từ chối' : 'Rejected',
+  }
+
   return (
     <div className="glass-card rounded-3xl p-8">
       <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center text-3xl">
@@ -469,8 +510,13 @@ function SuccessCard({
         {lang === 'VN' ? 'Đơn đã gửi!' : 'Order submitted!'}
       </h2>
       <p className="text-text-muted text-[14px] mb-1">
-        {lang === 'VN' ? 'Mã đơn hàng' : 'Order ID'}: <strong>#{orderId}</strong>
+        {lang === 'VN' ? 'Mã đơn hàng' : 'Order code'}:{' '}
+        <strong>{order.order_code || `#${order.id}`}</strong>
       </p>
+      <p className="text-primary font-semibold text-[14px] mb-3">{statusLabel[order.status]}</p>
+      {order.rejected_reason ? (
+        <p className="text-red-700 text-[13px] mb-3">{order.rejected_reason}</p>
+      ) : null}
       <p className="text-text-muted text-[13px] mb-6">
         {lang === 'VN'
           ? 'Nhân viên sẽ xác nhận và giao món đến phòng của quý khách.'

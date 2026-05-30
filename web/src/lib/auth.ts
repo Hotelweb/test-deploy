@@ -7,6 +7,15 @@
  */
 
 export type AuthScope = 'system' | 'hotel'
+export type HotelStaffRole =
+  | 'hotel_admin'
+  | 'reception'
+  | 'cashier'
+  | 'fnb_staff'
+  | 'kitchen_staff'
+  | 'customer_care'
+  | 'content_manager'
+  | 'manager'
 
 export interface AuthUser {
   id: number
@@ -14,8 +23,11 @@ export interface AuthUser {
   full_name: string
   scope: AuthScope
   hotel_id?: number
+  role?: HotelStaffRole
+  roles?: HotelStaffRole[]
   avatar_url?: string | null
   is_active: boolean
+  last_login_at?: string | null
 }
 
 export interface AuthState {

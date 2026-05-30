@@ -13,13 +13,22 @@ import {
 } from '../../hooks/useGuestFaviconNotifications'
 import { detectPreferredLanguage, getLanguage } from '../../lib/languages'
 import { t } from '../../lib/i18n'
+import {
+  ChatMessageStatusValue,
+  ChatMessageTypeValue,
+  ChatReadActor,
+  ChatSenderType,
+  ChatSocketRole,
+  ChatTranslationStatusValue,
+  type ChatOutboundMessageType,
+} from '../../lib/socketEvents'
 import { BookingForm, type BookingFormValue } from './BookingForm'
 import { MessageBubble, type DisplayMessage } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import { ConnectionBanner, ConnectionDot } from './ConnectionBanner'
 import { QuickReplies } from './QuickReplies'
 import { SkeletonList } from './SkeletonMessage'
-import { CloseIcon, ImageIcon, SendIcon, SmileIcon, SparkleIcon } from '../icons/ServiceIcons'
+import { CloseIcon, ImageIcon, SendIcon, SparkleIcon } from '../icons/ServiceIcons'
 
 interface ChatWindowProps {
   hotelId: number
@@ -106,26 +115,28 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   }, [])
 
   const handleTyping = useCallback(
-    (data: { sessionId: number; sender_type: 'CUSTOMER' | 'STAFF'; isTyping: boolean }) => {
-      if (data.sender_type === 'STAFF') setStaffTyping(data.isTyping)
+    (data: { sessionId: number; sender_type: ChatSenderType; isTyping: boolean }) => {
+      if (data.sender_type === ChatSenderType.Staff) setStaffTyping(data.isTyping)
     },
     [],
   )
 
-  const handleMessagesRead = useCallback(
-    (data: { sessionId: number; by: 'customer' | 'staff' }) => {
-      if (data.by !== 'staff') return
-      // Staff opened the conversation — mark our (CUSTOMER) outgoing messages as read
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.sender_type === 'CUSTOMER' && !m.is_read
-            ? { ...m, is_read: true, status: 'READ', read_at: new Date().toISOString() }
-            : m,
-        ),
-      )
-    },
-    [],
-  )
+  const handleMessagesRead = useCallback((data: { sessionId: number; by: ChatReadActor }) => {
+    if (data.by !== ChatReadActor.Staff) return
+    // Staff opened the conversation — mark our (CUSTOMER) outgoing messages as read
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.sender_type === ChatSenderType.Customer && !m.is_read
+          ? {
+              ...m,
+              is_read: true,
+              status: ChatMessageStatusValue.Read,
+              read_at: new Date().toISOString(),
+            }
+          : m,
+      ),
+    )
+  }, [])
 
   const {
     connection,
@@ -134,7 +145,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
     markRead,
   } = useChatSocket({
     sessionId: session?.id ?? null,
-    role: 'customer',
+    role: ChatSocketRole.Customer,
     onNewMessage: handleNewMessage,
     onTyping: handleTyping,
     onMessagesRead: handleMessagesRead,
@@ -151,7 +162,10 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   useEffect(() => {
     if (step !== 'chat' || connection !== 'online' || !session) return
     const hasUnreadStaff = messages.some(
-      (m) => m.sender_type === 'STAFF' && !m.is_read && m.message_type !== 'SYSTEM',
+      (m) =>
+        m.sender_type === ChatSenderType.Staff &&
+        !m.is_read &&
+        m.message_type !== ChatMessageTypeValue.System,
     )
     if (!hasUnreadStaff) return
 
@@ -159,10 +173,12 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
     const run = async () => {
       try {
         markRead()
-        await markSessionRead(session.id, 'customer').catch(() => undefined)
+        await markSessionRead(session.id, ChatReadActor.Customer).catch(() => undefined)
         if (cancelled) return
         setMessages((prev) =>
-          prev.map((m) => (m.sender_type === 'STAFF' && !m.is_read ? { ...m, is_read: true } : m)),
+          prev.map((m) =>
+            m.sender_type === ChatSenderType.Staff && !m.is_read ? { ...m, is_read: true } : m,
+          ),
         )
       } catch (err) {
         console.error('Failed to mark messages read:', err)
@@ -227,7 +243,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   // Sending
   // -----------------------------------------------------------------------
   const performSend = useCallback(
-    (text: string, opts?: { messageType?: 'TEXT' | 'IMAGE'; imageUrl?: string }) => {
+    (text: string, opts?: { messageType?: ChatOutboundMessageType; imageUrl?: string }) => {
       if (!session) return
       const trimmed = text.trim()
       if (!trimmed && !opts?.imageUrl) return
@@ -236,17 +252,17 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
       const optimistic: DisplayMessage = {
         id: -Date.now(),
         session_id: session.id,
-        sender_type: 'CUSTOMER',
-        message_type: opts?.messageType ?? 'TEXT',
+        sender_type: ChatSenderType.Customer,
+        message_type: opts?.messageType ?? ChatMessageTypeValue.Text,
         source_language: language,
         target_language: 'vi',
         original_message: trimmed || null,
         translated_message: null,
-        translation_status: 'PENDING',
+        translation_status: ChatTranslationStatusValue.Pending,
         translation_provider: null,
         translation_duration_ms: null,
         image_url: opts?.imageUrl ?? null,
-        status: 'SENDING',
+        status: ChatMessageStatusValue.Sending,
         client_message_id: clientId,
         is_read: false,
         read_at: null,
@@ -259,7 +275,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
         sessionId: session.id,
         message: trimmed,
         source_language: language,
-        sender_type: 'CUSTOMER',
+        sender_type: ChatSenderType.Customer,
         client_message_id: clientId,
         message_type: opts?.messageType,
         image_url: opts?.imageUrl,
@@ -270,7 +286,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
         setMessages((prev) =>
           prev.map((m) =>
             m.client_message_id === clientId && m._optimistic
-              ? { ...m, _failed: true, _optimistic: false, status: 'FAILED' }
+              ? { ...m, _failed: true, _optimistic: false, status: ChatMessageStatusValue.Failed }
               : m,
           ),
         )
@@ -298,7 +314,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = reader.result as string
-      performSend('', { messageType: 'IMAGE', imageUrl: dataUrl })
+      performSend('', { messageType: ChatMessageTypeValue.Image, imageUrl: dataUrl })
     }
     reader.readAsDataURL(file)
     e.target.value = ''
@@ -307,7 +323,10 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   const handleRetry = (msg: DisplayMessage) => {
     setMessages((prev) => prev.filter((m) => m.client_message_id !== msg.client_message_id))
     performSend(msg.original_message ?? '', {
-      messageType: msg.message_type === 'IMAGE' ? 'IMAGE' : 'TEXT',
+      messageType:
+        msg.message_type === ChatMessageTypeValue.Image
+          ? ChatMessageTypeValue.Image
+          : ChatMessageTypeValue.Text,
       imageUrl: msg.image_url ?? undefined,
     })
   }
@@ -335,7 +354,10 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
   const showQuickReplies =
     step === 'chat' &&
     !staffTyping &&
-    messages.filter((m) => m.message_type !== 'SYSTEM' && m.sender_type === 'CUSTOMER').length === 0
+    messages.filter(
+      (m) =>
+        m.message_type !== ChatMessageTypeValue.System && m.sender_type === ChatSenderType.Customer,
+    ).length === 0
 
   // -----------------------------------------------------------------------
   // Render
@@ -442,7 +464,7 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
                 <MessageBubble
                   key={`${msg.id}_${msg.client_message_id ?? ''}`}
                   message={msg}
-                  viewer="customer"
+                  viewer={ChatSocketRole.Customer}
                   labels={{
                     sending: t(lang, 'status.sending'),
                     sent: t(lang, 'status.sent'),
@@ -510,15 +532,8 @@ export function ChatWindow({ hotelId, hotelName, onClose }: ChatWindowProps) {
                     }}
                     rows={1}
                     placeholder={t(lang, 'chat.input_placeholder')}
-                    className="block w-full h-11 max-h-[120px] resize-none px-4 py-3 rounded-2xl bg-gray-100 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white border border-transparent focus:border-primary/30 transition-all placeholder:text-text-lighter pr-10 overflow-y-auto"
+                    className="block w-full h-11 max-h-[120px] resize-none px-4 py-3 rounded-2xl bg-gray-100 text-[14px] leading-5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white border border-transparent focus:border-primary/30 transition-all placeholder:text-text-lighter overflow-y-auto"
                   />
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center text-text-muted cursor-pointer transition-colors"
-                    aria-label="Add emoji"
-                  >
-                    <SmileIcon className="w-4 h-4" />
-                  </button>
                 </div>
                 <button
                   type="button"

@@ -16,6 +16,7 @@ import {
   TranslationService,
   type TranslationResult,
 } from './translation.service.js';
+import { ChatReadActor } from './socket-events.js';
 
 const STAFF_LANGUAGE = 'vi';
 
@@ -136,12 +137,43 @@ export class ChatService {
   async updateSessionStatus(
     sessionId: number,
     status: ChatSessionStatus,
+    handledBy?: number,
   ): Promise<CustomerSession> {
     const session = await this.getSession(sessionId);
     session.status = status;
-    if (status === ChatSessionStatus.CLOSED) {
+    if (handledBy) {
+      session.last_handled_by = handledBy;
+      session.handled_at = new Date();
+    }
+    if (
+      status === ChatSessionStatus.CLOSED ||
+      status === ChatSessionStatus.RESOLVED
+    ) {
       session.closed_at = new Date();
     }
+    return this.sessionRepo.save(session);
+  }
+
+  async assignSession(
+    sessionId: number,
+    input: { assigned_to_user_id?: number; assigned_group?: string },
+  ): Promise<CustomerSession> {
+    const session = await this.getSession(sessionId);
+    session.assigned_user_id = input.assigned_to_user_id ?? null;
+    session.assigned_group = input.assigned_group?.trim() || null;
+    session.assigned_at = new Date();
+    if (session.status === ChatSessionStatus.OPEN) {
+      session.status = ChatSessionStatus.ASSIGNED;
+    }
+    return this.sessionRepo.save(session);
+  }
+
+  async updateInternalNote(
+    sessionId: number,
+    note?: string,
+  ): Promise<CustomerSession> {
+    const session = await this.getSession(sessionId);
+    session.internal_note = note?.trim() || null;
     return this.sessionRepo.save(session);
   }
 
@@ -210,7 +242,10 @@ export class ChatService {
     if (session.status === ChatSessionStatus.OPEN) {
       session.status = ChatSessionStatus.ASSIGNED;
       session.assigned_user_id = userId;
+      session.assigned_at = new Date();
     }
+    session.last_handled_by = userId;
+    session.handled_at = new Date();
     await this.sessionRepo.save(session);
 
     return saved;
@@ -218,12 +253,14 @@ export class ChatService {
 
   async markMessagesRead(
     sessionId: number,
-    by: 'customer' | 'staff',
+    by: ChatReadActor,
   ): Promise<{ updated: number }> {
     // Customer reading -> mark STAFF messages as read.
     // Staff reading    -> mark CUSTOMER messages as read AND zero session unread.
     const senderType =
-      by === 'customer' ? MessageSenderType.STAFF : MessageSenderType.CUSTOMER;
+      by === ChatReadActor.Customer
+        ? MessageSenderType.STAFF
+        : MessageSenderType.CUSTOMER;
 
     const result = await this.messageRepo
       .createQueryBuilder()
@@ -238,7 +275,7 @@ export class ChatService {
       .andWhere('is_read = FALSE')
       .execute();
 
-    if (by === 'staff') {
+    if (by === ChatReadActor.Staff) {
       await this.sessionRepo.update(sessionId, { unread_count: 0 });
     }
 
@@ -274,7 +311,7 @@ export class ChatService {
     } = input;
 
     const sameLang = dto.source_language === targetLanguage;
-    const isImage = dto.message_type === 'IMAGE';
+    const isImage = dto.message_type === MessageType.IMAGE;
 
     let translationStatus: TranslationStatus;
     if (isImage || sameLang) {

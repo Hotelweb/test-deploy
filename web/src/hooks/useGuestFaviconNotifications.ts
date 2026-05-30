@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { API_BASE, getChatSessionByToken, type ChatMessage, type FoodOrder } from '../api'
+import {
+  ChatMessageTypeValue,
+  ChatSenderType,
+  ChatSocketClientEvent,
+  ChatSocketRole,
+  ChatSocketServerEvent,
+} from '../lib/socketEvents'
 
 const GUEST_ORDER_IDS_KEY = 'guest_order_ids'
 const GUEST_NOTIFICATION_EVENT = 'guest-notification-targets-changed'
@@ -152,17 +159,23 @@ export function useGuestFaviconNotifications(enabled = true) {
 
       const joinTargets = () => {
         targets.sessionIds.forEach((sessionId) => {
-          socket?.emit('joinSession', { sessionId, role: 'customer' })
+          socket?.emit(ChatSocketClientEvent.JoinSession, {
+            sessionId,
+            role: ChatSocketRole.Customer,
+          })
         })
         targets.orderIds.forEach((orderId) => {
-          socket?.emit('joinOrder', { orderId })
+          socket?.emit(ChatSocketClientEvent.JoinOrder, { orderId })
         })
       }
 
       socket.on('connect', joinTargets)
       socket.on('reconnect', joinTargets)
-      socket.on('newMessage', (message: ChatMessage) => {
-        if (message.sender_type === 'STAFF' && message.message_type !== 'SYSTEM') {
+      socket.on(ChatSocketServerEvent.NewMessage, (message: ChatMessage) => {
+        if (
+          message.sender_type === ChatSenderType.Staff &&
+          message.message_type !== ChatMessageTypeValue.System
+        ) {
           incrementBadge()
           notifyGuest(
             'A25 Hotel',
@@ -170,7 +183,7 @@ export function useGuestFaviconNotifications(enabled = true) {
           )
         }
       })
-      socket.on('orderStatusChanged', (data: GuestOrderNotification) => {
+      socket.on(ChatSocketServerEvent.OrderStatusChanged, (data: GuestOrderNotification) => {
         incrementBadge()
         notifyGuest('A25 Hotel', getOrderStatusMessage(data.order))
       })
@@ -186,13 +199,15 @@ export function useGuestFaviconNotifications(enabled = true) {
 
 function getOrderStatusMessage(order: FoodOrder) {
   const statusText: Record<FoodOrder['status'], string> = {
-    PENDING: 'Your order is pending confirmation.',
-    ACCEPTED: 'Your order has been accepted.',
-    REJECTED: order.rejected_reason
+    new: 'Your order is pending confirmation.',
+    accepted: 'Your order has been accepted.',
+    preparing: 'Your order is being prepared.',
+    delivering: 'Your order is on the way.',
+    rejected: order.rejected_reason
       ? `Your order was rejected: ${order.rejected_reason}`
       : 'Your order was rejected.',
-    COMPLETED: 'Your order has been completed.',
-    CANCELLED: 'Your order was cancelled.',
+    completed: 'Your order has been completed.',
+    cancelled: 'Your order was cancelled.',
   }
 
   return `Order #${order.id}: ${statusText[order.status]}`

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { getHotel, type Hotel } from '../api'
 import { EditHotelModal } from '../components/EditHotelModal'
+import { HotelThemeCustomizer } from '../components/HotelThemeCustomizer'
 import { UserMenu } from '../components/UserMenu'
 import {
   ArrowRightIcon,
@@ -12,10 +13,18 @@ import {
   HotelIcon,
   InRoomDiningIcon,
   ServicesIcon,
+  PeopleIcon,
+  UserCircleIcon,
 } from '../components/icons/ServiceIcons'
 import { useAuth } from '../hooks/useAuth'
 import { useHotelAdminNotifications } from '../hooks/useHotelAdminNotifications'
-import type { AdminNotificationItem } from '../hooks/useHotelAdminNotifications'
+import { useInternalChatNotifications } from '../hooks/useInternalChatNotifications'
+import type {
+  AdminNotificationItem,
+  AdminNotificationKind,
+} from '../hooks/useHotelAdminNotifications'
+import { can } from '../lib/permissions'
+import { applyHotelTheme, resetHotelTheme } from '../lib/theme'
 
 export function HotelAdminHomePage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()
@@ -28,7 +37,9 @@ export function HotelAdminHomePage() {
   const [error, setError] = useState<string | null>(null)
   const [editingHotel, setEditingHotel] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [themeOpen, setThemeOpen] = useState(false)
   const notifications = useHotelAdminNotifications(hotelId || 0)
+  const internalNotifications = useInternalChatNotifications(hotelId || 0)
 
   const loadHotel = useCallback(async () => {
     if (!hotelId) return
@@ -36,6 +47,7 @@ export function HotelAdminHomePage() {
     setError(null)
     try {
       const data = await getHotel(hotelId)
+      applyHotelTheme(data.theme_config)
       setHotel(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được thông tin khách sạn')
@@ -54,6 +66,12 @@ export function HotelAdminHomePage() {
     }
   }, [loadHotel])
 
+  useEffect(() => {
+    if (!hotel) return
+    applyHotelTheme(hotel.theme_config)
+    return () => resetHotelTheme()
+  }, [hotel])
+
   if (!hotelId) return <Navigate to="/admin" replace />
 
   const actions = [
@@ -66,6 +84,7 @@ export function HotelAdminHomePage() {
       tone: 'bg-violet-50 text-violet-700 border-violet-100',
       onClick: () => setEditingHotel(true),
       disabled: !hotel,
+      permission: 'hotel:manage' as const,
     },
     {
       title: 'Chat với khách',
@@ -74,6 +93,17 @@ export function HotelAdminHomePage() {
       icon: ChatIcon,
       tone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
       onClick: () => navigate(`/admin/${hotelId}/chat`),
+      permission: 'chat:handle' as const,
+      badgeCount: notifications.chatUnread,
+    },
+    {
+      title: 'Chat nội bộ',
+      description: 'Trao đổi trực tiếp giữa quản trị khách sạn và system admin.',
+      buttonLabel: 'Mở chat nội bộ',
+      icon: UserCircleIcon,
+      tone: 'bg-teal-50 text-teal-700 border-teal-100',
+      onClick: () => navigate(`/admin/${hotelId}/internal-chat`),
+      badgeCount: internalNotifications.totalUnread,
     },
     {
       title: 'Quản lý đơn hàng',
@@ -82,6 +112,8 @@ export function HotelAdminHomePage() {
       icon: InRoomDiningIcon,
       tone: 'bg-orange-50 text-orange-700 border-orange-100',
       onClick: () => navigate(`/admin/${hotelId}/food-order`),
+      permission: 'orders:view' as const,
+      badgeCount: notifications.pendingOrders,
     },
     {
       title: 'Thêm dịch vụ',
@@ -90,6 +122,16 @@ export function HotelAdminHomePage() {
       icon: ServicesIcon,
       tone: 'bg-emerald-50 text-primary border-emerald-100',
       onClick: () => navigate(`/admin/${hotelId}/services`),
+      permission: 'services:manage' as const,
+    },
+    {
+      title: 'Nhân viên',
+      description: 'Tạo tài khoản, phân vai trò, khóa/mở và đặt lại mật khẩu cho nhân viên.',
+      buttonLabel: 'Quản lý nhân viên',
+      icon: PeopleIcon,
+      tone: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+      onClick: () => navigate(`/admin/${hotelId}/staff`),
+      permission: 'users:manage' as const,
     },
     {
       title: 'Xem trang khách',
@@ -100,12 +142,12 @@ export function HotelAdminHomePage() {
       onClick: () => hotel && navigate(`/hotel/${hotel.slug}`),
       disabled: !hotel,
     },
-  ]
+  ].filter((action) => !action.permission || can(auth?.user, action.permission))
 
   return (
     <div className="min-h-screen bg-background-warm">
       <header className="glass-nav sticky top-0 z-30 px-4 sm:px-8 lg:px-16 xl:px-20 py-4 sm:py-5">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="max-w-[88rem] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
             <div className="w-11 h-11 rounded-xl bg-emerald-50 text-primary flex items-center justify-center flex-shrink-0 overflow-hidden">
               {hotel?.logo_url ? (
@@ -127,9 +169,24 @@ export function HotelAdminHomePage() {
             </div>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+            {can(auth?.user, 'hotel:manage') ? (
+              <HotelThemeCustomizer
+                hotel={hotel}
+                open={themeOpen}
+                onToggle={() => {
+                  setThemeOpen((prev) => !prev)
+                  setNotificationsOpen(false)
+                }}
+                onClose={() => setThemeOpen(false)}
+                onSaved={(saved) => setHotel(saved)}
+              />
+            ) : null}
             <NotificationBell
               open={notificationsOpen}
-              onToggle={() => setNotificationsOpen((prev) => !prev)}
+              onToggle={() => {
+                setNotificationsOpen((prev) => !prev)
+                setThemeOpen(false)
+              }}
               onClose={() => setNotificationsOpen(false)}
               chatUnread={notifications.chatUnread}
               pendingOrders={notifications.pendingOrders}
@@ -162,7 +219,7 @@ export function HotelAdminHomePage() {
       </header>
 
       <main className="px-4 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10">
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        <div className="max-w-[88rem] mx-auto flex flex-col gap-6">
           {error ? (
             <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-[13px] text-red-700">
               {error}
@@ -192,15 +249,20 @@ export function HotelAdminHomePage() {
               <p className="text-text-muted text-sm">Đang tải trang quản trị...</p>
             </div>
           ) : (
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {actions.map((action) => (
                 <button
                   key={action.title}
                   type="button"
                   onClick={action.onClick}
                   disabled={action.disabled}
-                  className="glass-card glass-card-hover rounded-2xl p-5 text-left cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                  className="relative glass-card glass-card-hover rounded-2xl p-5 text-left cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                 >
+                  {'badgeCount' in action && action.badgeCount ? (
+                    <span className="absolute right-4 top-4 min-w-6 h-6 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center shadow-soft">
+                      {action.badgeCount > 99 ? '99+' : action.badgeCount}
+                    </span>
+                  ) : null}
                   <span
                     className={`w-12 h-12 rounded-xl border flex items-center justify-center ${action.tone}`}
                   >
@@ -263,6 +325,14 @@ function NotificationBell({
   onOpenChat: () => void
   onOpenOrders: () => void
 }) {
+  const notificationGroups = (['chat', 'order'] as AdminNotificationKind[])
+    .map((kind) => ({
+      kind,
+      meta: getNotificationMeta(kind),
+      items: items.filter((item) => item.kind === kind),
+    }))
+    .filter((group) => group.items.length > 0)
+
   return (
     <div className="relative">
       <button
@@ -287,7 +357,7 @@ function NotificationBell({
             aria-label="Đóng thông báo"
             onClick={onClose}
           />
-          <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2rem))] bg-white border border-border rounded-2xl shadow-modal overflow-hidden">
+          <div className="absolute right-0 top-12 z-40 w-[min(28rem,calc(100vw-2rem))] bg-white border border-border rounded-2xl shadow-modal overflow-hidden">
             <div className="px-4 py-3 border-b border-border-light flex items-center justify-between gap-3">
               <div>
                 <p className="text-[13.5px] font-semibold text-text">Thông báo</p>
@@ -306,7 +376,7 @@ function NotificationBell({
               ) : null}
             </div>
 
-            <div className="p-3 grid grid-cols-2 gap-2 border-b border-border-light">
+            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 border-b border-border-light">
               <button
                 type="button"
                 onClick={onOpenChat}
@@ -345,53 +415,79 @@ function NotificationBell({
               </div>
             ) : null}
 
-            <div className="max-h-72 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto">
               {items.length === 0 ? (
                 <p className="px-4 py-6 text-center text-[13px] text-text-light">
                   Chưa có thông báo gần đây
                 </p>
               ) : (
-                <ul role="list" className="divide-y divide-border-light">
-                  {items.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={item.kind === 'chat' ? onOpenChat : onOpenOrders}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <span className="flex items-start gap-2">
+                <div className="py-1">
+                  {notificationGroups.map((group) => (
+                    <section
+                      key={group.kind}
+                      className="border-b border-border-light last:border-b-0"
+                    >
+                      <div className="flex items-center justify-between gap-3 px-4 pb-1.5 pt-3">
+                        <span className="inline-flex items-center gap-2">
                           <span
-                            className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              item.kind === 'chat'
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'bg-orange-50 text-orange-700'
-                            }`}
+                            className={`flex h-7 w-7 items-center justify-center rounded-lg ${group.meta.tone}`}
                           >
-                            {item.kind === 'chat' ? (
-                              <ChatIcon className="w-3.5 h-3.5" />
-                            ) : (
-                              <InRoomDiningIcon className="w-3.5 h-3.5" />
-                            )}
+                            <group.meta.Icon className="h-3.5 w-3.5" />
                           </span>
-                          <span className="min-w-0">
-                            <span className="block text-[13px] font-semibold text-text line-clamp-1">
-                              {item.title}
-                            </span>
-                            <span className="block text-[12px] text-text-muted line-clamp-2 mt-0.5">
-                              {item.body}
-                            </span>
-                            <span className="block text-[10.5px] text-text-lighter mt-1">
-                              {new Date(item.createdAt).toLocaleTimeString('vi-VN', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
+                          <span className="text-[12px] font-bold text-text">
+                            {group.meta.label}
                           </span>
                         </span>
-                      </button>
-                    </li>
+                        <span className="rounded-full bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-text-light">
+                          {group.items.length}
+                        </span>
+                      </div>
+                      <ul role="list" className="divide-y divide-border-light">
+                        {group.items.map((item) => {
+                          const meta = getNotificationMeta(item.kind)
+                          return (
+                            <li key={item.id}>
+                              <button
+                                type="button"
+                                onClick={item.kind === 'chat' ? onOpenChat : onOpenOrders}
+                                className="w-full px-4 py-3 text-left hover:bg-gray-50 cursor-pointer transition-colors"
+                              >
+                                <span className="flex items-start gap-2.5">
+                                  <span
+                                    className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${meta.tone}`}
+                                  >
+                                    <meta.Icon className="w-3.5 h-3.5" />
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="flex flex-wrap items-center gap-2">
+                                      <span className="block text-[13px] font-semibold text-text line-clamp-1">
+                                        {item.title}
+                                      </span>
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${meta.badge}`}
+                                      >
+                                        {meta.shortLabel}
+                                      </span>
+                                    </span>
+                                    <span className="block text-[12px] text-text-muted line-clamp-2 mt-0.5">
+                                      {item.body}
+                                    </span>
+                                    <span className="block text-[10.5px] text-text-lighter mt-1">
+                                      {new Date(item.createdAt).toLocaleTimeString('vi-VN', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                  </span>
+                                </span>
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </section>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
           </div>
@@ -399,4 +495,24 @@ function NotificationBell({
       ) : null}
     </div>
   )
+}
+
+function getNotificationMeta(kind: AdminNotificationKind) {
+  if (kind === 'chat') {
+    return {
+      label: 'Tin nhắn khách',
+      shortLabel: 'Chat',
+      tone: 'bg-indigo-50 text-indigo-700',
+      badge: 'bg-indigo-50 text-indigo-700',
+      Icon: ChatIcon,
+    }
+  }
+
+  return {
+    label: 'Đơn hàng',
+    shortLabel: 'Đơn',
+    tone: 'bg-orange-50 text-orange-700',
+    badge: 'bg-orange-50 text-orange-700',
+    Icon: InRoomDiningIcon,
+  }
 }

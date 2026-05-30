@@ -10,6 +10,7 @@ import {
 import { ServiceFormModal } from '../components/services/ServiceFormModal'
 import { ServiceDetailModal } from '../components/services/ServiceDetailModal'
 import { UserMenu } from '../components/UserMenu'
+import { AccessDeniedScreen } from '../components/RequireAuth'
 import { getIconEntry, isIconUrl } from '../lib/serviceCatalog'
 import {
   ArrowLeftIcon,
@@ -20,6 +21,8 @@ import {
   SearchIcon,
   TrashIcon,
 } from '../components/icons/ServiceIcons'
+import { useAuth } from '../hooks/useAuth'
+import { can } from '../lib/permissions'
 
 type ModalState =
   | { kind: 'closed' }
@@ -41,6 +44,8 @@ export function HotelServicesAdminPage() {
   const { hotelId: hotelIdParam } = useParams<{ hotelId: string }>()
   const hotelId = Number(hotelIdParam)
   const navigate = useNavigate()
+  const auth = useAuth()
+  const allowed = can(auth?.user, 'services:manage')
 
   const [hotel, setHotel] = useState<Hotel | null>(null)
   const [services, setServices] = useState<AdminHotelService[]>([])
@@ -54,7 +59,7 @@ export function HotelServicesAdminPage() {
   // Data loading
   // -------------------------------------------------------------------------
   const loadAll = useCallback(async () => {
-    if (!hotelId) return
+    if (!hotelId || !allowed) return
     setLoading(true)
     setError(null)
     try {
@@ -67,7 +72,7 @@ export function HotelServicesAdminPage() {
     } finally {
       setLoading(false)
     }
-  }, [hotelId])
+  }, [allowed, hotelId])
 
   // Defer through a microtask so React 19 doesn't flag the synchronous
   // setState inside the effect body.
@@ -96,6 +101,8 @@ export function HotelServicesAdminPage() {
       return inTranslations || inMain
     })
   }, [services, search])
+
+  if (!allowed) return <AccessDeniedScreen reason="Bạn không có quyền quản lý dịch vụ." />
 
   // -------------------------------------------------------------------------
   // Handlers
@@ -139,7 +146,7 @@ export function HotelServicesAdminPage() {
     <div className="min-h-screen bg-background-warm">
       {/* Header */}
       <header className="glass-nav sticky top-0 z-30 px-4 sm:px-8 lg:px-16 xl:px-20 py-5">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div className="max-w-[88rem] mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => navigate(`/admin/${hotelId}`)}
@@ -174,7 +181,7 @@ export function HotelServicesAdminPage() {
       </header>
 
       <main className="px-4 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10">
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        <div className="max-w-[88rem] mx-auto flex flex-col gap-6">
           {/* Stats + search */}
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex items-center gap-2 text-[13.5px] text-text-muted">

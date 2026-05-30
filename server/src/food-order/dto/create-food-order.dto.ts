@@ -51,6 +51,12 @@ export class CreateFoodOrderDto {
   @MaxLength(50)
   customer_phone?: string;
 
+  @ApiPropertyOptional({ example: 'guest-cart-uuid' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  idempotency_key?: string;
+
   @ApiPropertyOptional({ example: 'Không cay' })
   @IsOptional()
   @IsString()
